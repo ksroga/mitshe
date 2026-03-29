@@ -167,7 +167,14 @@ Generate specific, actionable improvement suggestions with code examples.`,
                   title: { type: 'string' },
                   category: {
                     type: 'string',
-                    enum: ['refactoring', 'performance', 'security', 'readability', 'testing', 'best_practice'],
+                    enum: [
+                      'refactoring',
+                      'performance',
+                      'security',
+                      'readability',
+                      'testing',
+                      'best_practice',
+                    ],
                   },
                   priority: { type: 'string', enum: ['low', 'medium', 'high'] },
                   description: { type: 'string' },
@@ -270,7 +277,14 @@ export const CODE_IMPROVEMENT_SUGGESTIONS_METADATA = {
   description:
     'AI-powered code analysis that identifies quality issues, performance problems, and provides actionable improvement suggestions with code examples.',
   category: 'Development',
-  tags: ['ai', 'code-review', 'refactoring', 'performance', 'best-practices', 'suggestions'],
+  tags: [
+    'ai',
+    'code-review',
+    'refactoring',
+    'performance',
+    'best-practices',
+    'suggestions',
+  ],
   requiredIntegrations: ['ai'],
   variables: {
     focus_areas: {

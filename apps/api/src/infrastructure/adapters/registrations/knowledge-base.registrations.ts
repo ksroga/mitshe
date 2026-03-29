@@ -11,6 +11,6 @@ knowledgeBaseRegistry.register('OBSIDIAN', (config: AdapterConfig) =>
   createObsidianAdapter({
     baseUrl: config.baseUrl,
     apiKey: config.apiToken || config.accessToken || '',
-    insecure: config.insecure as boolean | undefined,
-  })
+    insecure: config.insecure,
+  }),
 );

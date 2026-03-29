@@ -22,9 +22,6 @@ import {
   isGitProviderType,
   isNotificationType,
   isKnowledgeBaseType,
-  ISSUE_TRACKER_TYPES,
-  GIT_PROVIDER_TYPES,
-  NOTIFICATION_TYPES,
 } from './adapter-registry';
 
 export { AdapterConfig } from './adapter-registry';

@@ -13,7 +13,7 @@ gitProviderRegistry.register('GITLAB', (config: AdapterConfig) =>
     baseUrl: config.baseUrl,
     accessToken: config.accessToken || config.apiToken || '',
     tokenType: config.tokenType as 'private' | 'oauth',
-  })
+  }),
 );
 
 // Register GitHub adapter
@@ -21,5 +21,5 @@ gitProviderRegistry.register('GITHUB', (config: AdapterConfig) =>
   createGitHubAdapter({
     baseUrl: config.baseUrl,
     accessToken: config.accessToken || config.apiToken || '',
-  })
+  }),
 );

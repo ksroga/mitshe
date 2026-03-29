@@ -70,9 +70,18 @@ Analyze the backlog items and categorize them by priority, effort, and value.`,
                   id: { type: 'string' },
                   title: { type: 'string' },
                   estimatedPoints: { type: 'number' },
-                  priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
-                  businessValue: { type: 'string', enum: ['high', 'medium', 'low'] },
-                  technicalRisk: { type: 'string', enum: ['high', 'medium', 'low'] },
+                  priority: {
+                    type: 'string',
+                    enum: ['critical', 'high', 'medium', 'low'],
+                  },
+                  businessValue: {
+                    type: 'string',
+                    enum: ['high', 'medium', 'low'],
+                  },
+                  technicalRisk: {
+                    type: 'string',
+                    enum: ['high', 'medium', 'low'],
+                  },
                   dependencies: { type: 'array', items: { type: 'string' } },
                   category: { type: 'string' },
                 },
@@ -173,7 +182,10 @@ Identify risks and mitigation strategies for this sprint.`,
                 type: 'object',
                 properties: {
                   risk: { type: 'string' },
-                  probability: { type: 'string', enum: ['low', 'medium', 'high'] },
+                  probability: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high'],
+                  },
                   impact: { type: 'string', enum: ['low', 'medium', 'high'] },
                   mitigation: { type: 'string' },
                   contingency: { type: 'string' },
@@ -257,7 +269,15 @@ export const SPRINT_PLANNER_METADATA = {
   description:
     'AI-assisted sprint planning that analyzes backlog items, prioritizes based on value and risk, and creates a balanced sprint plan with risk assessment.',
   category: 'Project Management',
-  tags: ['ai', 'sprint', 'planning', 'agile', 'scrum', 'prioritization', 'backlog'],
+  tags: [
+    'ai',
+    'sprint',
+    'planning',
+    'agile',
+    'scrum',
+    'prioritization',
+    'backlog',
+  ],
   requiredIntegrations: ['ai'],
   variables: {
     sprint_duration: {

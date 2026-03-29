@@ -135,6 +135,7 @@ function ClerkModeTeamPage() {
 
     setIsInviting(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (organization as any).inviteMember({
         emailAddress: inviteEmail,
         role: inviteRole,
@@ -158,6 +159,7 @@ function ClerkModeTeamPage() {
 
     setIsRemoving(membershipId);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (organization as any).removeMember(membershipId);
       toast.success("Member removed successfully");
       if (memberships?.revalidate) {
@@ -179,6 +181,7 @@ function ClerkModeTeamPage() {
 
     setIsChangingRole(membershipId);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (organization as any).updateMember({ userId, role: newRole });
       toast.success("Role updated successfully");
       if (memberships?.revalidate) {
@@ -301,6 +304,7 @@ function ClerkModeTeamPage() {
           <Shield className="h-4 w-4" />
           <span>Admins</span>
           <span className="font-semibold text-foreground">
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {membersList.filter((m: any) => m.role === "org:admin").length}
           </span>
         </div>
@@ -331,6 +335,7 @@ function ClerkModeTeamPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {membersList.map((member: any) => {
                 const user = member.publicUserData;
                 const name =

@@ -14,9 +14,7 @@ import { QUEUES, NotificationJob } from '../../../infrastructure/queue/queues';
  * - Adds JIRA comment with result summary
  */
 @EventsHandler(TaskCompletedEvent)
-export class OnTaskCompletedHandler
-  implements IEventHandler<TaskCompletedEvent>
-{
+export class OnTaskCompletedHandler implements IEventHandler<TaskCompletedEvent> {
   private readonly logger = new Logger(OnTaskCompletedHandler.name);
 
   constructor(

@@ -30,7 +30,9 @@ export class JwtAuthStrategy implements AuthStrategy {
   ) {
     // JWT auth is enabled when AUTH_MODE is 'selfhosted' or when JWT_SECRET is set
     const authMode = this.configService.get<string>('AUTH_MODE');
-    this.isEnabled = authMode === 'selfhosted' || !!this.configService.get<string>('JWT_SECRET');
+    this.isEnabled =
+      authMode === 'selfhosted' ||
+      !!this.configService.get<string>('JWT_SECRET');
 
     const secret = this.configService.get<string>('JWT_SECRET');
     if (this.isEnabled && !secret) {
@@ -110,7 +112,9 @@ export class JwtAuthStrategy implements AuthStrategy {
       });
 
       if (!membership) {
-        throw new UnauthorizedException('User is not a member of this organization');
+        throw new UnauthorizedException(
+          'User is not a member of this organization',
+        );
       }
 
       return {

@@ -56,7 +56,9 @@ class AdapterRegistry<T> {
   create(type: string, config: AdapterConfig): T {
     const creator = this.creators.get(type.toUpperCase());
     if (!creator) {
-      throw new Error(`Unknown ${this.name} type: ${type}. Available: ${this.getAvailableTypes().join(', ')}`);
+      throw new Error(
+        `Unknown ${this.name} type: ${type}. Available: ${this.getAvailableTypes().join(', ')}`,
+      );
     }
     return creator(config);
   }
@@ -67,11 +69,21 @@ class AdapterRegistry<T> {
 }
 
 // Singleton registries for each adapter type
-export const issueTrackerRegistry = new AdapterRegistry<IssueTrackerPort>('issue tracker');
-export const gitProviderRegistry = new AdapterRegistry<GitProviderPort>('git provider');
-export const notificationRegistry = new AdapterRegistry<NotificationPort>('notification provider');
-export const aiProviderRegistry = new AdapterRegistry<AIProviderPort>('AI provider');
-export const knowledgeBaseRegistry = new AdapterRegistry<KnowledgeBasePort>('knowledge base');
+export const issueTrackerRegistry = new AdapterRegistry<IssueTrackerPort>(
+  'issue tracker',
+);
+export const gitProviderRegistry = new AdapterRegistry<GitProviderPort>(
+  'git provider',
+);
+export const notificationRegistry = new AdapterRegistry<NotificationPort>(
+  'notification provider',
+);
+export const aiProviderRegistry = new AdapterRegistry<AIProviderPort>(
+  'AI provider',
+);
+export const knowledgeBaseRegistry = new AdapterRegistry<KnowledgeBasePort>(
+  'knowledge base',
+);
 
 // Issue tracker types for type checking
 export const ISSUE_TRACKER_TYPES = ['JIRA', 'YOUTRACK', 'LINEAR'] as const;
@@ -82,11 +94,23 @@ export const GIT_PROVIDER_TYPES = ['GITLAB', 'GITHUB'] as const;
 export type GitProviderType = (typeof GIT_PROVIDER_TYPES)[number];
 
 // Notification provider types
-export const NOTIFICATION_TYPES = ['SLACK', 'DISCORD', 'TELEGRAM', 'TEAMS'] as const;
+export const NOTIFICATION_TYPES = [
+  'SLACK',
+  'DISCORD',
+  'TELEGRAM',
+  'TEAMS',
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 // AI provider types
-export const AI_PROVIDER_TYPES = ['CLAUDE', 'OPENAI', 'OPENROUTER', 'GEMINI', 'GROQ', 'CLAUDE_CODE_LOCAL'] as const;
+export const AI_PROVIDER_TYPES = [
+  'CLAUDE',
+  'OPENAI',
+  'OPENROUTER',
+  'GEMINI',
+  'GROQ',
+  'CLAUDE_CODE_LOCAL',
+] as const;
 export type AIProviderType = (typeof AI_PROVIDER_TYPES)[number];
 
 // Knowledge base types

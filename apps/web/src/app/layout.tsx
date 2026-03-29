@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/auth";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
-import { CookieConsent } from "@/components/cookie-consent";
 import type { AuthMode } from "@/lib/auth/types";
 import "./globals.css";
 
@@ -50,7 +49,6 @@ export default function RootLayout({
         >
           <Providers>{children}</Providers>
           <Toaster />
-          {authMode === "clerk" && <CookieConsent />}
         </body>
       </html>
     </AuthProvider>

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
-  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
@@ -34,6 +33,13 @@ function localModeMiddleware(req: NextRequest) {
 export default isLocalMode
   ? localModeMiddleware
   : clerkMiddleware(async (auth, req) => {
+      const { pathname } = req.nextUrl;
+
+      // Redirect root to dashboard (no landing page)
+      if (pathname === "/") {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
+
       if (!isPublicRoute(req)) {
         await auth.protect();
       }

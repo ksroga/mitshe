@@ -121,8 +121,14 @@ Identify and categorize the key requirements for this project.`,
                 type: 'object',
                 properties: {
                   requirement: { type: 'string' },
-                  priority: { type: 'string', enum: ['must-have', 'should-have', 'nice-to-have'] },
-                  complexity: { type: 'string', enum: ['low', 'medium', 'high'] },
+                  priority: {
+                    type: 'string',
+                    enum: ['must-have', 'should-have', 'nice-to-have'],
+                  },
+                  complexity: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high'],
+                  },
                 },
               },
             },
@@ -313,7 +319,11 @@ return {
     { id: 'e1', source: 'trigger', target: 'analyze_feasibility' },
     { id: 'e2', source: 'trigger', target: 'identify_requirements' },
     { id: 'e3', source: 'analyze_feasibility', target: 'suggest_architecture' },
-    { id: 'e4', source: 'identify_requirements', target: 'suggest_architecture' },
+    {
+      id: 'e4',
+      source: 'identify_requirements',
+      target: 'suggest_architecture',
+    },
     { id: 'e5', source: 'suggest_architecture', target: 'create_roadmap' },
     { id: 'e6', source: 'create_roadmap', target: 'format_report' },
   ],
@@ -324,7 +334,14 @@ export const PROJECT_ANALYZER_METADATA = {
   description:
     'Comprehensive AI analysis of project ideas including feasibility assessment, requirements identification, architecture suggestions, and roadmap generation.',
   category: 'Project Management',
-  tags: ['ai', 'planning', 'architecture', 'requirements', 'roadmap', 'analysis'],
+  tags: [
+    'ai',
+    'planning',
+    'architecture',
+    'requirements',
+    'roadmap',
+    'analysis',
+  ],
   requiredIntegrations: ['ai'],
   variables: {
     analysis_depth: {

@@ -28,7 +28,6 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  History,
 } from "lucide-react";
 import { formatDistanceToNow } from "@/lib/utils";
 import {
@@ -37,7 +36,7 @@ import {
   useRunWorkflow,
 } from "@/lib/api/hooks";
 import { toast } from "sonner";
-import { executionStatusConfig, getExecutionStatus } from "@/lib/status-config";
+import { getExecutionStatus } from "@/lib/status-config";
 
 function formatDuration(startedAt: string, completedAt: string | null): string {
   const start = new Date(startedAt).getTime();

@@ -57,7 +57,13 @@ Analyze this task and provide a detailed complexity assessment.`,
           properties: {
             complexity: {
               type: 'string',
-              enum: ['trivial', 'simple', 'moderate', 'complex', 'very_complex'],
+              enum: [
+                'trivial',
+                'simple',
+                'moderate',
+                'complex',
+                'very_complex',
+              ],
               description: 'Overall complexity level',
             },
             factors: {
@@ -161,7 +167,10 @@ Identify potential risks and mitigation strategies.`,
                 type: 'object',
                 properties: {
                   risk: { type: 'string' },
-                  probability: { type: 'string', enum: ['low', 'medium', 'high'] },
+                  probability: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high'],
+                  },
                   impact: { type: 'string', enum: ['low', 'medium', 'high'] },
                   mitigation: { type: 'string' },
                 },

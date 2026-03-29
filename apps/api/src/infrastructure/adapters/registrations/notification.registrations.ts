@@ -4,7 +4,10 @@
  */
 
 import { notificationRegistry, AdapterConfig } from '../adapter-registry';
-import { createSlackAdapter, createSlackWebhookAdapter } from '../notification/slack.adapter';
+import {
+  createSlackAdapter,
+  createSlackWebhookAdapter,
+} from '../notification/slack.adapter';
 import { createDiscordAdapter } from '../notification/discord.adapter';
 import { createTelegramAdapter } from '../notification/telegram.adapter';
 
@@ -26,17 +29,17 @@ notificationRegistry.register('SLACK', (config: AdapterConfig) => {
 notificationRegistry.register('DISCORD', (config: AdapterConfig) =>
   createDiscordAdapter({
     webhookUrl: config.webhookUrl || '',
-    username: config.username as string | undefined,
-    avatarUrl: config.avatarUrl as string | undefined,
-  })
+    username: config.username,
+    avatarUrl: config.avatarUrl,
+  }),
 );
 
 // Register Telegram adapter
 notificationRegistry.register('TELEGRAM', (config: AdapterConfig) =>
   createTelegramAdapter({
     botToken: config.botToken || config.accessToken || '',
-    defaultChatId: config.defaultChatId as string | undefined,
-  })
+    defaultChatId: config.defaultChatId,
+  }),
 );
 
 // Teams adapter placeholder - to be implemented

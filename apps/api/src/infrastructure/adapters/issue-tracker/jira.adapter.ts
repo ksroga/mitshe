@@ -220,7 +220,6 @@ export class JiraAdapter implements IssueTrackerPort {
     return customFields;
   }
 
-
   async searchIssues(input: SearchIssuesInput): Promise<SearchResult> {
     // Build JQL query
     let jql = input.jql || '';
@@ -485,9 +484,7 @@ export class JiraAdapter implements IssueTrackerPort {
       id: data.id,
       key: data.key,
       title: fields.summary,
-      description: fields.description
-        ? adfToText(fields.description)
-        : null,
+      description: fields.description ? adfToText(fields.description) : null,
       status: fields.status?.name || 'Unknown',
       statusCategory,
       priority: fields.priority?.name,

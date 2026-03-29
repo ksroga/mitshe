@@ -39,7 +39,12 @@ export class AuthGuard implements CanActivate {
     private readonly jwtStrategy: JwtAuthStrategy,
   ) {
     // Order matters: Local first (if enabled), then API key, then JWT (selfhosted), then Clerk
-    this.strategies = [this.localStrategy, this.apiKeyStrategy, this.jwtStrategy, this.clerkStrategy];
+    this.strategies = [
+      this.localStrategy,
+      this.apiKeyStrategy,
+      this.jwtStrategy,
+      this.clerkStrategy,
+    ];
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  ExecutionContext,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/infrastructure/persistence/prisma/prisma.service';
 import { AuthStrategy, AuthResult } from './auth-strategy.interface';

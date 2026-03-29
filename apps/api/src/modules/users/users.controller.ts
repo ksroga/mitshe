@@ -10,7 +10,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { UsersService, RegisterDto, LoginDto } from './users.service';
+import { UsersService } from './users.service';
 import { AuthGuard } from '@/shared/auth/auth.guard';
 import { AuthResult } from '@/shared/auth/strategies/auth-strategy.interface';
 

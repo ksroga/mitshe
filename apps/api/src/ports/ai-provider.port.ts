@@ -155,8 +155,13 @@ export interface TokenCountingAIProviderPort extends AIProviderPort {
 }
 
 // Type guard for checking token counting capability
-export function hasTokenCounting(port: AIProviderPort): port is TokenCountingAIProviderPort {
-  return 'countTokens' in port && typeof (port as TokenCountingAIProviderPort).countTokens === 'function';
+export function hasTokenCounting(
+  port: AIProviderPort,
+): port is TokenCountingAIProviderPort {
+  return (
+    'countTokens' in port &&
+    typeof (port as TokenCountingAIProviderPort).countTokens === 'function'
+  );
 }
 
 export const AI_PROVIDER_PORT = Symbol('AIProviderPort');

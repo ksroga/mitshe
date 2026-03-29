@@ -15,7 +15,7 @@ issueTrackerRegistry.register('JIRA', (config: AdapterConfig) =>
     email: config.email || '',
     apiToken: config.apiToken || config.accessToken || '',
     isCloud: config.baseUrl?.includes('atlassian.net'),
-  })
+  }),
 );
 
 // Register YouTrack adapter
@@ -23,12 +23,12 @@ issueTrackerRegistry.register('YOUTRACK', (config: AdapterConfig) =>
   createYouTrackAdapter({
     baseUrl: config.baseUrl || '',
     permanentToken: config.apiToken || config.accessToken || '',
-  })
+  }),
 );
 
 // Register Linear adapter
 issueTrackerRegistry.register('LINEAR', (config: AdapterConfig) =>
   createLinearAdapter({
     apiKey: config.apiKey || config.accessToken || '',
-  })
+  }),
 );

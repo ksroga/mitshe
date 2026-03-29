@@ -106,15 +106,26 @@ export interface UserSearchableNotificationPort extends NotificationPort {
 /**
  * Full-featured notification port with all capabilities
  */
-export interface RichNotificationPort extends ChannelAwareNotificationPort, UserSearchableNotificationPort {}
+export interface RichNotificationPort
+  extends ChannelAwareNotificationPort, UserSearchableNotificationPort {}
 
 // Type guards for checking capabilities
-export function hasChannelSupport(port: NotificationPort): port is ChannelAwareNotificationPort {
-  return 'listChannels' in port && typeof (port as ChannelAwareNotificationPort).listChannels === 'function';
+export function hasChannelSupport(
+  port: NotificationPort,
+): port is ChannelAwareNotificationPort {
+  return (
+    'listChannels' in port &&
+    typeof (port as ChannelAwareNotificationPort).listChannels === 'function'
+  );
 }
 
-export function hasUserSearch(port: NotificationPort): port is UserSearchableNotificationPort {
-  return 'searchUsers' in port && typeof (port as UserSearchableNotificationPort).searchUsers === 'function';
+export function hasUserSearch(
+  port: NotificationPort,
+): port is UserSearchableNotificationPort {
+  return (
+    'searchUsers' in port &&
+    typeof (port as UserSearchableNotificationPort).searchUsers === 'function'
+  );
 }
 
 export const NOTIFICATION_PORT = Symbol('NotificationPort');

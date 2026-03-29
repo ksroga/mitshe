@@ -89,9 +89,7 @@ import { toast } from "sonner";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import type { Task, TaskPriority, JiraImportPreview } from "@/lib/api/types";
 import {
-  taskStatusConfig,
   getTaskStatus,
-  priorityConfig,
   getPriority,
 } from "@/lib/status-config";
 

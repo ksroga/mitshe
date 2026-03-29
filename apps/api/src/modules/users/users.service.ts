@@ -57,12 +57,18 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
-    this.jwtSecret = this.configService.get<string>('JWT_SECRET') || 'dev-secret-change-in-production';
-    this.accessTokenExpiry = this.configService.get<string>('JWT_EXPIRY') || '15m';
-    this.refreshTokenExpiry = this.configService.get<string>('JWT_REFRESH_EXPIRY') || '7d';
+    this.jwtSecret =
+      this.configService.get<string>('JWT_SECRET') ||
+      'dev-secret-change-in-production';
+    this.accessTokenExpiry =
+      this.configService.get<string>('JWT_EXPIRY') || '15m';
+    this.refreshTokenExpiry =
+      this.configService.get<string>('JWT_REFRESH_EXPIRY') || '7d';
   }
 
-  async register(dto: RegisterDto): Promise<{ user: UserInfo; tokens: AuthTokens }> {
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ user: UserInfo; tokens: AuthTokens }> {
     // Validate email format
     if (!this.isValidEmail(dto.email)) {
       throw new BadRequestException('Invalid email format');
@@ -100,7 +106,8 @@ export class UsersService {
       });
 
       // Create default organization
-      const orgName = dto.organizationName || `${dto.firstName || 'My'}'s Workspace`;
+      const orgName =
+        dto.organizationName || `${dto.firstName || 'My'}'s Workspace`;
       const organization = await tx.organization.create({
         data: {
           name: orgName,
@@ -175,7 +182,10 @@ export class UsersService {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -189,7 +199,9 @@ export class UsersService {
         (m) => m.organizationId === dto.organizationId,
       );
       if (!membership) {
-        throw new UnauthorizedException('You are not a member of this organization');
+        throw new UnauthorizedException(
+          'You are not a member of this organization',
+        );
       }
       organizationId = dto.organizationId;
     } else if (user.memberships.length === 1) {
@@ -207,7 +219,11 @@ export class UsersService {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, organizationId);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      organizationId,
+    );
 
     // Update last login
     await this.prisma.user.update({
@@ -310,7 +326,10 @@ export class UsersService {
     }
 
     // Verify old password
-    const isPasswordValid = await bcrypt.compare(oldPassword, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      oldPassword,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Current password is incorrect');
     }
@@ -356,7 +375,9 @@ export class UsersService {
     });
 
     if (!membership) {
-      throw new UnauthorizedException('You are not a member of this organization');
+      throw new UnauthorizedException(
+        'You are not a member of this organization',
+      );
     }
 
     // Generate new tokens with the new organization
@@ -489,7 +510,9 @@ export class UsersService {
 
   private isStrongPassword(password: string): boolean {
     // At least 8 characters, at least one letter and one number
-    return password.length >= 8 && /[a-zA-Z]/.test(password) && /\d/.test(password);
+    return (
+      password.length >= 8 && /[a-zA-Z]/.test(password) && /\d/.test(password)
+    );
   }
 
   private generateSlug(name: string): string {
