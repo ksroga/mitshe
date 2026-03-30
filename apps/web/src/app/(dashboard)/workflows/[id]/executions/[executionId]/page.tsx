@@ -455,8 +455,18 @@ export default function ExecutionDetailPage() {
       }
     });
 
+    // If execution is terminal, force any stuck "running" nodes to resolved state
+    const executionStatus = execution?.status;
+    if (executionStatus === "completed" || executionStatus === "failed") {
+      for (const result of results) {
+        if (result.status === "running" || result.status === "pending") {
+          result.status = result.error ? "failed" : "completed";
+        }
+      }
+    }
+
     return results;
-  }, [data?.nodeExecutions, nodeUpdates]);
+  }, [data?.nodeExecutions, nodeUpdates, execution?.status]);
 
   const definition = execution?.workflow?.definition;
   const nodes = definition?.nodes || [];
