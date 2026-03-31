@@ -21,6 +21,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +54,7 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: true
+          provenance: false
           tags: |
             ${{ env.REGISTRY }}/mitshe/api:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/mitshe/api:latest
@@ -64,12 +67,10 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
+          provenance: false
           tags: |
             ${{ env.REGISTRY }}/mitshe/web:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/mitshe/web:latest
-          build-args: |
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.CLERK_PUBLISHABLE_KEY }}
-            NEXT_PUBLIC_API_URL=${{ vars.API_URL || 'https://api.mitshe.io' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -79,6 +80,7 @@ jobs:
           context: apps/api/docker/executor
           file: apps/api/docker/executor/Dockerfile
           push: true
+          provenance: false
           tags: |
             ${{ env.REGISTRY }}/mitshe/executor:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/mitshe/executor:latest
@@ -91,6 +93,7 @@ jobs:
           context: .
           file: docker/light/Dockerfile
           push: true
+          provenance: false
           tags: |
             ${{ env.REGISTRY }}/mitshe/light:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/mitshe/light:latest
