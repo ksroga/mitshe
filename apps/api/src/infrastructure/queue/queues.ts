@@ -6,6 +6,7 @@ export const QUEUES = {
   TASK_PROCESSING: 'task-processing',
   WEBHOOK_PROCESSING: 'webhook-processing',
   NOTIFICATIONS: 'notifications',
+  POLLING: 'polling',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -24,6 +25,15 @@ export interface WebhookProcessingJob {
   payload: Record<string, unknown>;
   headers: Record<string, string>;
   timestamp: string;
+}
+
+export interface PollingJob {
+  workflowId: string;
+  organizationId: string;
+  triggerNodeId: string;
+  triggerType: string;
+  triggerConfig: Record<string, unknown>;
+  lastPolledAt?: string;
 }
 
 export interface NotificationJob {

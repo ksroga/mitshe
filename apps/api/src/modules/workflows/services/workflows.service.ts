@@ -2,8 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/persistence/prisma/prisma.service';
+import { PollingService } from '../../../infrastructure/queue/polling.service';
 import {
   CreateWorkflowDto,
   UpdateWorkflowDto,
@@ -22,7 +26,13 @@ import {
 
 @Injectable()
 export class WorkflowsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(WorkflowsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => PollingService))
+    private readonly pollingService: PollingService,
+  ) {}
 
   async create(organizationId: string, userId: string, dto: CreateWorkflowDto) {
     // Validate workflow definition if provided
@@ -169,10 +179,32 @@ export class WorkflowsService {
       workflow.definition as unknown as WorkflowDefinitionDto,
     );
 
-    return this.prisma.workflow.update({
+    const updated = await this.prisma.workflow.update({
       where: { id },
       data: { isActive: true },
     });
+
+    // Start polling for trigger nodes
+    const definition = updated.definition as any;
+    if (definition?.nodes) {
+      for (const node of definition.nodes) {
+        if (
+          node.type &&
+          node.type.startsWith('trigger:') &&
+          node.type !== 'trigger:manual'
+        ) {
+          await this.pollingService.startPolling(
+            updated.id,
+            organizationId,
+            node.id,
+            node.type,
+            node.config || {},
+          );
+        }
+      }
+    }
+
+    return updated;
   }
 
   async deactivate(organizationId: string, id: string) {
@@ -181,6 +213,9 @@ export class WorkflowsService {
     if (!workflow.isActive) {
       throw new BadRequestException('Workflow is already inactive');
     }
+
+    // Stop polling
+    await this.pollingService.stopPolling(id);
 
     return this.prisma.workflow.update({
       where: { id },
