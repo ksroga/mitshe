@@ -48,14 +48,13 @@ export interface BulkUpdateRepositoriesDto {
 }
 
 export interface SyncRepositoriesResult {
-  created: number;
-  updated: number;
+  synced: number;
   total: number;
 }
 
 export interface SyncAllRepositoriesResult {
   integrations: number;
-  totalCreated: number;
-  totalUpdated: number;
+  totalSynced: number;
+  totalRepositories: number;
   errors: string[];
 }

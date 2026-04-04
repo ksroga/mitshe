@@ -106,13 +106,13 @@ export default function RepositoriesPage() {
   const handleSync = async () => {
     try {
       const result = await syncRepositories.mutateAsync(undefined);
-      if ("totalCreated" in result) {
+      if ("totalSynced" in result) {
         toast.success(
-          `Synced ${result.totalCreated} new, ${result.totalUpdated} updated repositories`,
+          `Synced ${result.totalSynced} of ${result.totalRepositories} repositories`,
         );
       } else {
         toast.success(
-          `Synced ${result.created} new, ${result.updated} updated repositories`,
+          `Synced ${result.synced} of ${result.total} repositories`,
         );
       }
     } catch {
