@@ -830,6 +830,28 @@ export function useDeleteAICredential() {
   });
 }
 
+export function useTestAICredential() {
+  const getToken = useAuthToken();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      return api.aiCredentials.test(id, token);
+    },
+  });
+}
+
+export function useTestAICredentialBeforeConnect() {
+  const getToken = useAuthToken();
+
+  return useMutation({
+    mutationFn: async (data: { provider: string; apiKey?: string }) => {
+      const token = await getToken();
+      return api.aiCredentials.testBeforeConnect(data, token);
+    },
+  });
+}
+
 export function useRepositories(active?: boolean) {
   const getToken = useAuthToken();
 

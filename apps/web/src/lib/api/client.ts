@@ -461,6 +461,25 @@ export const api = {
         method: "DELETE",
         token,
       }),
+
+    test: (id: string, token: string) =>
+      request<{ success: boolean; message: string }>(
+        `/ai-credentials/${id}/test`,
+        {
+          method: "POST",
+          token,
+        },
+      ),
+
+    testBeforeConnect: (
+      data: { provider: string; apiKey?: string },
+      token: string,
+    ) =>
+      request<{ success: boolean; message: string }>("/ai-credentials/test", {
+        method: "POST",
+        body: JSON.stringify(data),
+        token,
+      }),
   },
 
   repositories: {
