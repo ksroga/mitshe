@@ -28,6 +28,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -39,11 +50,13 @@ import {
   Settings2,
   AlertCircle,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
 import { formatDistanceToNow } from "@/lib/utils";
 import {
   useRepositories,
   useUpdateRepository,
+  useDeleteRepository,
   useBulkUpdateRepositories,
   useSyncRepositories,
   useIntegrations,
@@ -64,6 +77,7 @@ export default function RepositoriesPage() {
   const { data: repositories = [], isLoading } = useRepositories();
   const { data: integrations = [] } = useIntegrations();
   const updateRepository = useUpdateRepository();
+  const deleteRepository = useDeleteRepository();
   const bulkUpdate = useBulkUpdateRepositories();
   const syncRepositories = useSyncRepositories();
 
@@ -137,6 +151,16 @@ export default function RepositoriesPage() {
       setSelectedIds([]);
     } catch {
       toast.error("Failed to disable repositories");
+    }
+  };
+
+  const handleDelete = async (repo: Repository) => {
+    try {
+      await deleteRepository.mutateAsync(repo.id);
+      toast.success(`Repository "${repo.name}" deleted`);
+      setSelectedIds((prev) => prev.filter((id) => id !== repo.id));
+    } catch {
+      toast.error("Failed to delete repository");
     }
   };
 
@@ -391,6 +415,40 @@ export default function RepositoriesPage() {
                           >
                             {repo.isActive ? "Disable" : "Enable"}
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={deleteRepository.isPending}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Delete Repository
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete{" "}
+                                  <strong>{repo.name}</strong>? This will remove
+                                  the repository from mitshe. You can re-sync it
+                                  later from your Git provider.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(repo)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>
