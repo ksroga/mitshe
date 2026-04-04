@@ -39,6 +39,7 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AuditApiModule } from './modules/audit/audit.module';
 import { UsersModule } from './modules/users/users.module';
 import { AgentsModule } from './modules/agents/agents.module';
+import { EnvironmentsModule } from './modules/environments/environments.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 
 // App
@@ -152,6 +153,7 @@ import { AllExceptionsFilter } from './shared/filters/all-exceptions.filter';
     AuditApiModule,
     UsersModule,
     AgentsModule,
+    EnvironmentsModule,
     SessionsModule,
   ],
   controllers: [AppController],
