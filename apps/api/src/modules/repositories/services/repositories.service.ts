@@ -312,7 +312,7 @@ export class RepositoriesService {
   }
 
   /**
-   * Sync all git integrations for an organization
+   * Sync all git integrations for an organization (imports new repos via upsert)
    */
   async syncAll(organizationId: string) {
     const integrations = await this.prisma.integration.findMany({
@@ -346,6 +346,120 @@ export class RepositoriesService {
     }
 
     return results;
+  }
+
+  /**
+   * Sync only already-imported repositories (update metadata, no new imports)
+   */
+  async syncExisting(organizationId: string) {
+    const existingRepos = await this.prisma.repository.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        provider: true,
+        externalId: true,
+        integrationId: true,
+      },
+    });
+
+    if (existingRepos.length === 0) {
+      return { synced: 0, total: 0 };
+    }
+
+    // Group by integrationId
+    const byIntegration = new Map<
+      string,
+      Array<{ id: string; externalId: string }>
+    >();
+    for (const repo of existingRepos) {
+      const list = byIntegration.get(repo.integrationId) || [];
+      list.push({ id: repo.id, externalId: repo.externalId });
+      byIntegration.set(repo.integrationId, list);
+    }
+
+    const results = { synced: 0, total: existingRepos.length };
+
+    for (const [integrationId, repos] of byIntegration) {
+      try {
+        const adapter =
+          await this.adapterFactory.createGitProviderFromIntegration(
+            organizationId,
+            integrationId,
+          );
+        const remoteRepos = await adapter.listRepositories({ limit: 100 });
+        const remoteMap = new Map(remoteRepos.map((r) => [r.id, r]));
+
+        for (const repo of repos) {
+          const remote = remoteMap.get(repo.externalId);
+          if (!remote) continue;
+
+          try {
+            await this.prisma.repository.update({
+              where: { id: repo.id },
+              data: {
+                name: remote.name,
+                fullPath: remote.fullName,
+                description: remote.description,
+                defaultBranch: remote.defaultBranch,
+                cloneUrl: remote.cloneUrl,
+                webUrl: remote.webUrl,
+                lastSyncedAt: new Date(),
+              },
+            });
+            results.synced++;
+          } catch (error) {
+            this.logger.error(
+              `Failed to update repository ${repo.id}: ${(error as Error).message}`,
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to sync from integration ${integrationId}: ${(error as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Sync existing complete: ${results.synced} of ${results.total} repositories updated`,
+    );
+
+    return results;
+  }
+
+  /**
+   * Sync a single already-imported repository
+   */
+  async syncOne(organizationId: string, id: string) {
+    const repo = await this.findOne(organizationId, id);
+
+    const adapter =
+      await this.adapterFactory.createGitProviderFromIntegration(
+        organizationId,
+        repo.integrationId,
+      );
+
+    const remoteRepos = await adapter.listRepositories({ limit: 100 });
+    const remote = remoteRepos.find((r) => r.id === repo.externalId);
+
+    if (!remote) {
+      return { synced: false, message: 'Repository not found on remote' };
+    }
+
+    await this.prisma.repository.update({
+      where: { id },
+      data: {
+        name: remote.name,
+        fullPath: remote.fullName,
+        description: remote.description,
+        defaultBranch: remote.defaultBranch,
+        cloneUrl: remote.cloneUrl,
+        webUrl: remote.webUrl,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    return { synced: true, message: 'Repository synced successfully' };
   }
 
   /**

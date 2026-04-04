@@ -531,6 +531,24 @@ export const api = {
         token,
       }),
 
+    syncExisting: (token: string) =>
+      request<{ result: SyncRepositoriesResult }>(
+        "/repositories/sync/existing",
+        {
+          method: "POST",
+          token,
+        },
+      ),
+
+    syncOne: (id: string, token: string) =>
+      request<{ synced: boolean; message: string }>(
+        `/repositories/${id}/sync`,
+        {
+          method: "POST",
+          token,
+        },
+      ),
+
     syncAll: (token: string) =>
       request<{ result: SyncAllRepositoriesResult }>("/repositories/sync", {
         method: "POST",

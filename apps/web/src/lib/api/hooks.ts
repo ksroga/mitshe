@@ -971,6 +971,37 @@ export function useRemoteRepositories() {
   });
 }
 
+export function useSyncExistingRepositories() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      const response = await api.repositories.syncExisting(token);
+      return response.result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
+    },
+  });
+}
+
+export function useSyncOneRepository() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      return api.repositories.syncOne(id, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
+    },
+  });
+}
+
 export function useSyncRepositories() {
   const getToken = useAuthToken();
   const queryClient = useQueryClient();

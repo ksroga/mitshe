@@ -87,6 +87,21 @@ export class RepositoriesController {
     return { result };
   }
 
+  @Post('sync/existing')
+  @ApiOperation({
+    summary: 'Sync only already-imported repositories (update metadata)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync result',
+    type: SyncResultResponseDto,
+  })
+  async syncExisting(@OrganizationId() organizationId: string) {
+    const result =
+      await this.repositoriesService.syncExisting(organizationId);
+    return { result };
+  }
+
   @Post('sync/selective')
   @ApiOperation({ summary: 'Selectively sync chosen repositories' })
   @ApiResponse({
@@ -213,6 +228,20 @@ export class RepositoriesController {
       dto,
     );
     return { repository };
+  }
+
+  @Post(':id/sync')
+  @ApiOperation({ summary: 'Sync a single repository from remote' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync result',
+  })
+  @ApiResponse({ status: 404, description: 'Repository not found' })
+  async syncOne(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.repositoriesService.syncOne(organizationId, id);
   }
 
   @Delete(':id')

@@ -62,7 +62,8 @@ import {
   useBulkUpdateRepositories,
   useBulkDeleteRepositories,
   useRemoteRepositories,
-  useSyncRepositories,
+  useSyncExistingRepositories,
+  useSyncOneRepository,
   useSyncSelectiveRepositories,
   useIntegrations,
 } from "@/lib/api/hooks";
@@ -86,7 +87,8 @@ export default function RepositoriesPage() {
   const bulkUpdate = useBulkUpdateRepositories();
   const bulkDelete = useBulkDeleteRepositories();
   const fetchRemoteRepos = useRemoteRepositories();
-  const syncRepositories = useSyncRepositories();
+  const syncExisting = useSyncExistingRepositories();
+  const syncOne = useSyncOneRepository();
   const syncSelective = useSyncSelectiveRepositories();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -116,16 +118,35 @@ export default function RepositoriesPage() {
 
   const handleSync = async () => {
     try {
-      const result = await syncRepositories.mutateAsync(undefined);
-      if ("totalSynced" in result) {
-        toast.success(
-          `Synced ${result.totalSynced} of ${result.totalRepositories} repositories`,
-        );
+      const result = await syncExisting.mutateAsync();
+      toast.success(`Synced ${result.synced} of ${result.total} repositories`);
+    } catch {
+      toast.error("Failed to sync repositories");
+    }
+  };
+
+  const handleSyncOne = async (repo: Repository) => {
+    try {
+      const result = await syncOne.mutateAsync(repo.id);
+      if (result.synced) {
+        toast.success(`"${repo.name}" synced`);
       } else {
-        toast.success(
-          `Synced ${result.synced} of ${result.total} repositories`,
-        );
+        toast.error(result.message);
       }
+    } catch {
+      toast.error("Failed to sync repository");
+    }
+  };
+
+  const handleBulkSync = async () => {
+    if (selectedIds.length === 0) return;
+    let synced = 0;
+    try {
+      for (const id of selectedIds) {
+        const result = await syncOne.mutateAsync(id);
+        if (result.synced) synced++;
+      }
+      toast.success(`Synced ${synced} of ${selectedIds.length} repositories`);
     } catch {
       toast.error("Failed to sync repositories");
     }
@@ -319,9 +340,9 @@ export default function RepositoriesPage() {
             <Button
               variant="outline"
               onClick={handleSync}
-              disabled={syncRepositories.isPending || !hasGitIntegration}
+              disabled={syncExisting.isPending || !hasGitIntegration}
             >
-              {syncRepositories.isPending ? (
+              {syncExisting.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -398,6 +419,19 @@ export default function RepositoriesPage() {
             disabled={bulkUpdate.isPending}
           >
             Disable
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBulkSync}
+            disabled={syncOne.isPending}
+          >
+            {syncOne.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5 mr-1" />
+            )}
+            Sync
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -558,6 +592,19 @@ export default function RepositoriesPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleSyncOne(repo)}
+                            disabled={syncOne.isPending}
+                            title="Sync from remote"
+                          >
+                            {syncOne.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4" />
+                            )}
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
