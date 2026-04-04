@@ -30,6 +30,7 @@ import type {
   Repository,
   UpdateRepositoryDto,
   BulkUpdateRepositoriesDto,
+  RemoteRepository,
   SyncRepositoriesResult,
   SyncAllRepositoriesResult,
   WorkflowTemplateMetadata,
@@ -525,11 +526,29 @@ export const api = {
         token,
       }),
 
+    listRemote: (token: string) =>
+      request<{ repositories: RemoteRepository[] }>("/repositories/remote", {
+        token,
+      }),
+
     syncAll: (token: string) =>
       request<SyncAllRepositoriesResult>("/repositories/sync", {
         method: "POST",
         token,
       }),
+
+    syncSelective: (
+      data: { integrationId: string; externalIds: string[] },
+      token: string,
+    ) =>
+      request<{ result: SyncRepositoriesResult }>(
+        "/repositories/sync/selective",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+          token,
+        },
+      ),
 
     syncIntegration: (integrationId: string, token: string) =>
       request<SyncRepositoriesResult>(`/repositories/sync/${integrationId}`, {

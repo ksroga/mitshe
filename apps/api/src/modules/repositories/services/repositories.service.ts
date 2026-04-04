@@ -140,9 +140,79 @@ export class RepositoriesService {
   }
 
   /**
+   * List remote repositories from all connected git integrations without importing
+   */
+  async listRemoteRepositories(organizationId: string) {
+    const integrations = await this.prisma.integration.findMany({
+      where: {
+        organizationId,
+        status: IntegrationStatus.CONNECTED,
+        type: { in: [IntegrationType.GITLAB, IntegrationType.GITHUB] },
+      },
+    });
+
+    const existingRepos = await this.prisma.repository.findMany({
+      where: { organizationId },
+      select: { provider: true, externalId: true },
+    });
+
+    const existingSet = new Set(
+      existingRepos.map((r) => `${r.provider}:${r.externalId}`),
+    );
+
+    const results: Array<{
+      externalId: string;
+      name: string;
+      fullPath: string;
+      description: string | null;
+      defaultBranch: string;
+      webUrl: string;
+      provider: GitProvider;
+      integrationId: string;
+      alreadyImported: boolean;
+    }> = [];
+
+    for (const integration of integrations) {
+      try {
+        const adapter =
+          await this.adapterFactory.createGitProviderFromIntegration(
+            organizationId,
+            integration.id,
+          );
+        const remoteRepos = await adapter.listRepositories({ limit: 100 });
+        const provider = this.mapIntegrationToGitProvider(integration.type);
+
+        for (const remote of remoteRepos) {
+          results.push({
+            externalId: remote.id,
+            name: remote.name,
+            fullPath: remote.fullName,
+            description: remote.description ?? null,
+            defaultBranch: remote.defaultBranch,
+            webUrl: remote.webUrl,
+            provider,
+            integrationId: integration.id,
+            alreadyImported: existingSet.has(`${provider}:${remote.id}`),
+          });
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to list repos from ${integration.type}: ${(error as Error).message}`,
+        );
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Sync repositories from a git provider integration
    */
-  async syncFromIntegration(organizationId: string, integrationId: string) {
+  async syncFromIntegration(
+    organizationId: string,
+    integrationId: string,
+    externalIds?: string[],
+  ) {
     // Get the integration
     const integration = await this.prisma.integration.findFirst({
       where: {
@@ -167,7 +237,12 @@ export class RepositoriesService {
 
     // Fetch remote repositories
     this.logger.log(`Syncing repositories from ${integration.type}...`);
-    const remoteRepos = await adapter.listRepositories({ limit: 100 });
+    const allRemoteRepos = await adapter.listRepositories({ limit: 100 });
+
+    // Filter by external IDs if provided
+    const remoteRepos = externalIds
+      ? allRemoteRepos.filter((r) => externalIds.includes(r.id))
+      : allRemoteRepos;
 
     // Map provider type
     const provider = this.mapIntegrationToGitProvider(integration.type);

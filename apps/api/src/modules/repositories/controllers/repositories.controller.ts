@@ -24,6 +24,8 @@ import {
   UpdateRepositoryDto,
   BulkUpdateRepositoriesDto,
   BulkDeleteRepositoriesDto,
+  SelectiveSyncRepositoriesDto,
+  RemoteRepositoryResponseDto,
   RepositoryWrapperResponseDto,
   RepositoryListResponseDto,
   SyncResultResponseDto,
@@ -85,6 +87,25 @@ export class RepositoriesController {
     return { result };
   }
 
+  @Post('sync/selective')
+  @ApiOperation({ summary: 'Selectively sync chosen repositories' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync result',
+    type: SyncResultResponseDto,
+  })
+  async syncSelective(
+    @OrganizationId() organizationId: string,
+    @Body() dto: SelectiveSyncRepositoriesDto,
+  ) {
+    const result = await this.repositoriesService.syncFromIntegration(
+      organizationId,
+      dto.integrationId,
+      dto.externalIds,
+    );
+    return { result };
+  }
+
   @Post('sync/:integrationId')
   @ApiOperation({ summary: 'Sync repositories from a specific integration' })
   @ApiResponse({
@@ -101,6 +122,21 @@ export class RepositoriesController {
       integrationId,
     );
     return { result };
+  }
+
+  @Get('remote')
+  @ApiOperation({
+    summary: 'List remote repositories from connected git providers',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Remote repositories',
+    type: [RemoteRepositoryResponseDto],
+  })
+  async listRemote(@OrganizationId() organizationId: string) {
+    const repositories =
+      await this.repositoriesService.listRemoteRepositories(organizationId);
+    return { repositories };
   }
 
   @Patch('bulk')

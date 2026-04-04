@@ -51,6 +51,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Trash2,
+  Download,
+  Search,
 } from "lucide-react";
 import { formatDistanceToNow } from "@/lib/utils";
 import {
@@ -59,12 +61,13 @@ import {
   useDeleteRepository,
   useBulkUpdateRepositories,
   useBulkDeleteRepositories,
-  useSyncRepositories,
+  useRemoteRepositories,
+  useSyncSelectiveRepositories,
   useIntegrations,
 } from "@/lib/api/hooks";
 import { Pagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
-import type { Repository, GitProvider } from "@/lib/api/types";
+import type { Repository, RemoteRepository, GitProvider } from "@/lib/api/types";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -81,13 +84,19 @@ export default function RepositoriesPage() {
   const deleteRepository = useDeleteRepository();
   const bulkUpdate = useBulkUpdateRepositories();
   const bulkDelete = useBulkDeleteRepositories();
-  const syncRepositories = useSyncRepositories();
+  const fetchRemoteRepos = useRemoteRepositories();
+  const syncSelective = useSyncSelectiveRepositories();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const [branchPattern, setBranchPattern] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [remoteRepos, setRemoteRepos] = useState<RemoteRepository[]>([]);
+  const [syncSelectedIds, setSyncSelectedIds] = useState<string[]>([]);
+  const [syncSearch, setSyncSearch] = useState("");
 
   const totalPages = Math.ceil(repositories.length / ITEMS_PER_PAGE);
   const paginatedRepos = repositories.slice(
@@ -103,21 +112,82 @@ export default function RepositoriesPage() {
     (i) => i.status === "CONNECTED",
   );
 
-  const handleSync = async () => {
+  const handleOpenSyncDialog = async () => {
     try {
-      const result = await syncRepositories.mutateAsync(undefined);
-      if ("totalSynced" in result) {
-        toast.success(
-          `Synced ${result.totalSynced} of ${result.totalRepositories} repositories`,
-        );
-      } else {
-        toast.success(
-          `Synced ${result.synced} of ${result.total} repositories`,
-        );
-      }
+      const repos = await fetchRemoteRepos.mutateAsync();
+      setRemoteRepos(repos);
+      // Pre-select repos that are not yet imported
+      setSyncSelectedIds(
+        repos.filter((r) => !r.alreadyImported).map((r) => r.externalId),
+      );
+      setSyncSearch("");
+      setSyncDialogOpen(true);
     } catch {
-      toast.error("Failed to sync repositories");
+      toast.error("Failed to fetch remote repositories");
     }
+  };
+
+  const handleSyncSelected = async () => {
+    if (syncSelectedIds.length === 0) {
+      toast.error("No repositories selected");
+      return;
+    }
+
+    // Group by integrationId
+    const byIntegration = new Map<string, string[]>();
+    for (const externalId of syncSelectedIds) {
+      const repo = remoteRepos.find((r) => r.externalId === externalId);
+      if (!repo) continue;
+      const ids = byIntegration.get(repo.integrationId) || [];
+      ids.push(externalId);
+      byIntegration.set(repo.integrationId, ids);
+    }
+
+    try {
+      let totalSynced = 0;
+      for (const [integrationId, externalIds] of byIntegration) {
+        const { result } = await syncSelective.mutateAsync({
+          integrationId,
+          externalIds,
+        });
+        totalSynced += result.synced;
+      }
+      toast.success(`Imported ${totalSynced} repositories`);
+      setSyncDialogOpen(false);
+    } catch {
+      toast.error("Failed to import repositories");
+    }
+  };
+
+  const filteredRemoteRepos = remoteRepos.filter(
+    (r) =>
+      !syncSearch ||
+      r.name.toLowerCase().includes(syncSearch.toLowerCase()) ||
+      r.fullPath.toLowerCase().includes(syncSearch.toLowerCase()),
+  );
+
+  const toggleSyncSelectAll = () => {
+    const filteredIds = filteredRemoteRepos.map((r) => r.externalId);
+    const allSelected = filteredIds.every((id) =>
+      syncSelectedIds.includes(id),
+    );
+    if (allSelected) {
+      setSyncSelectedIds((prev) =>
+        prev.filter((id) => !filteredIds.includes(id)),
+      );
+    } else {
+      setSyncSelectedIds((prev) => [
+        ...new Set([...prev, ...filteredIds]),
+      ]);
+    }
+  };
+
+  const toggleSyncSelect = (externalId: string) => {
+    setSyncSelectedIds((prev) =>
+      prev.includes(externalId)
+        ? prev.filter((id) => id !== externalId)
+        : [...prev, externalId],
+    );
   };
 
   const handleToggleActive = async (repo: Repository) => {
@@ -226,15 +296,15 @@ export default function RepositoriesPage() {
           </p>
         </div>
         <Button
-          onClick={handleSync}
-          disabled={syncRepositories.isPending || !hasGitIntegration}
+          onClick={handleOpenSyncDialog}
+          disabled={fetchRemoteRepos.isPending || !hasGitIntegration}
         >
-          {syncRepositories.isPending ? (
+          {fetchRemoteRepos.isPending ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <Download className="w-4 h-4 mr-2" />
           )}
-          Sync Repositories
+          Import Repositories
         </Button>
       </div>
 
@@ -354,9 +424,17 @@ export default function RepositoriesPage() {
                   : "Connect a Git integration to see your repositories."}
               </p>
               {hasGitIntegration && (
-                <Button variant="outline" onClick={handleSync}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Sync Now
+                <Button
+                  variant="outline"
+                  onClick={handleOpenSyncDialog}
+                  disabled={fetchRemoteRepos.isPending}
+                >
+                  {fetchRemoteRepos.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Import Repositories
                 </Button>
               )}
             </div>
@@ -559,6 +637,107 @@ export default function RepositoriesPage() {
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Import Repositories</DialogTitle>
+            <DialogDescription>
+              Select repositories to import from your Git providers.
+              Already imported repositories are marked.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={syncSearch}
+                onChange={(e) => setSyncSearch(e.target.value)}
+                placeholder="Search repositories..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <DialogBody className="flex-1 overflow-y-auto min-h-0 -mx-1 px-1">
+            {remoteRepos.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No repositories found from your Git providers.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 py-2 px-1 sticky top-0 bg-background z-10 border-b">
+                  <Checkbox
+                    checked={
+                      filteredRemoteRepos.length > 0 &&
+                      filteredRemoteRepos.every((r) =>
+                        syncSelectedIds.includes(r.externalId),
+                      )
+                    }
+                    onCheckedChange={toggleSyncSelectAll}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {syncSelectedIds.length} of {remoteRepos.length} selected
+                  </span>
+                </div>
+                {filteredRemoteRepos.map((repo) => (
+                  <label
+                    key={`${repo.provider}:${repo.externalId}`}
+                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={syncSelectedIds.includes(repo.externalId)}
+                      onCheckedChange={() => toggleSyncSelect(repo.externalId)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate">
+                          {repo.fullPath}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={`${providerConfig[repo.provider]?.color || "bg-gray-500"} text-white border-0 text-[10px] px-1.5 py-0`}
+                        >
+                          {providerConfig[repo.provider]?.name || repo.provider}
+                        </Badge>
+                        {repo.alreadyImported && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            Imported
+                          </Badge>
+                        )}
+                      </div>
+                      {repo.description && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {repo.description}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSyncDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSyncSelected}
+              disabled={syncSelective.isPending || syncSelectedIds.length === 0}
+            >
+              {syncSelective.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Import {syncSelectedIds.length}{" "}
+              {syncSelectedIds.length === 1 ? "Repository" : "Repositories"}
             </Button>
           </DialogFooter>
         </DialogContent>
