@@ -11,8 +11,10 @@ export interface AgentSession {
   id: string;
   organizationId: string;
   projectId: string | null;
+  agentDefinitionId: string | null;
   name: string;
   instructions: string;
+  startArguments: string | null;
   status: SessionStatus;
   aiCredentialId: string | null;
   containerId: string | null;
@@ -29,6 +31,10 @@ export interface AgentSession {
   aiCredential?: {
     id: string;
     provider: string;
+  };
+  agentDefinition?: {
+    id: string;
+    name: string;
   };
 }
 
@@ -50,6 +56,8 @@ export interface CreateSessionDto {
   projectId?: string;
   repositoryIds: string[];
   aiCredentialId?: string;
+  agentDefinitionId?: string;
+  startArguments?: string;
   instructions?: string;
 }
 
