@@ -66,7 +66,7 @@ export class SessionContainerService implements OnModuleInit {
       User: 'root',
       Entrypoint: ['bash', '-c'],
       Cmd: [
-        'chown -R executor:executor /home/executor/.claude 2>/dev/null; exec su -s /bin/bash executor -c "node /session/server.js"',
+        'chown -R executor:executor /home/executor 2>/dev/null; exec su -s /bin/bash executor -c "node /session/server.js"',
       ],
       Env: [`SESSION_CONFIG=${sessionConfig}`],
       WorkingDir: '/workspace',
@@ -77,9 +77,9 @@ export class SessionContainerService implements OnModuleInit {
         'mitshe.created-at': new Date().toISOString(),
       },
       HostConfig: {
-        // Shared volume for Claude Code auth — first session logs in,
-        // all subsequent sessions reuse the token automatically
-        Binds: ['mitshe-claude-config:/home/executor/.claude'],
+        // Shared volume for executor home — Claude Code auth persists
+        // across sessions (first session logs in, others reuse token)
+        Binds: ['mitshe-executor-home:/home/executor'],
         Memory: 4 * 1024 * 1024 * 1024, // 4GB
         NanoCpus: 2 * 1e9, // 2 CPUs
         PidsLimit: 512,
