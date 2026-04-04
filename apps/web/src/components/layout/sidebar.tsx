@@ -7,6 +7,7 @@ import {
   FolderKanban,
   ListTodo,
   MessageSquareCode,
+  BotMessageSquare,
   Workflow,
   History,
   Plug,
@@ -63,6 +64,12 @@ const agentNavItems = [
     href: "/sessions",
     icon: MessageSquareCode,
     tourId: "nav-sessions",
+  },
+  {
+    title: "Agents",
+    href: "/agents",
+    icon: BotMessageSquare,
+    tourId: "nav-agents",
   },
 ];
 

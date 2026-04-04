@@ -21,6 +21,8 @@ import type {
   UpdateRepositoryDto,
   BulkUpdateRepositoriesDto,
   CreateFromTemplateDto,
+  CreateAgentDefinitionDto,
+  UpdateAgentDefinitionDto,
   CreateSessionDto,
 } from "./types";
 
@@ -77,6 +79,11 @@ export const queryKeys = {
     available: () => [...queryKeys.repositories.all, "available"] as const,
     detail: (id: string) =>
       [...queryKeys.repositories.all, "detail", id] as const,
+  },
+  agents: {
+    all: ["agents"] as const,
+    list: () => [...queryKeys.agents.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.agents.all, "detail", id] as const,
   },
   sessions: {
     all: ["sessions"] as const,
@@ -1263,6 +1270,77 @@ export function useWriteSessionFile() {
     }) => {
       const token = await getToken();
       return api.sessions.writeFile(id, path, content, token);
+    },
+  });
+}
+
+// =========================================================================
+// Agents
+// =========================================================================
+
+export function useAgents() {
+  const getToken = useAuthToken();
+
+  return useQuery({
+    queryKey: queryKeys.agents.list(),
+    queryFn: async () => {
+      const token = await getToken();
+      const { agents } = await api.agents.list(token);
+      return agents;
+    },
+  });
+}
+
+export function useCreateAgent() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateAgentDefinitionDto) => {
+      const token = await getToken();
+      const { agent } = await api.agents.create(data, token);
+      return agent;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.agents.all });
+    },
+  });
+}
+
+export function useUpdateAgent() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateAgentDefinitionDto;
+    }) => {
+      const token = await getToken();
+      const { agent } = await api.agents.update(id, data, token);
+      return agent;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.agents.all });
+    },
+  });
+}
+
+export function useDeleteAgent() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      await api.agents.delete(id, token);
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.agents.all });
     },
   });
 }

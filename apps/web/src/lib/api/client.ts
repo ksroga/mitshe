@@ -33,6 +33,9 @@ import type {
   RemoteRepository,
   SyncRepositoriesResult,
   SyncAllRepositoriesResult,
+  AgentDefinition,
+  CreateAgentDefinitionDto,
+  UpdateAgentDefinitionDto,
   AgentSession,
   CreateSessionDto,
   SessionFileNode,
@@ -574,6 +577,34 @@ export const api = {
     syncIntegration: (integrationId: string, token: string) =>
       request<SyncRepositoriesResult>(`/repositories/sync/${integrationId}`, {
         method: "POST",
+        token,
+      }),
+  },
+
+  agents: {
+    list: (token: string) =>
+      request<{ agents: AgentDefinition[] }>("/agents", { token }),
+
+    get: (id: string, token: string) =>
+      request<{ agent: AgentDefinition }>(`/agents/${id}`, { token }),
+
+    create: (data: CreateAgentDefinitionDto, token: string) =>
+      request<{ agent: AgentDefinition }>("/agents", {
+        method: "POST",
+        body: JSON.stringify(data),
+        token,
+      }),
+
+    update: (id: string, data: UpdateAgentDefinitionDto, token: string) =>
+      request<{ agent: AgentDefinition }>(`/agents/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+        token,
+      }),
+
+    delete: (id: string, token: string) =>
+      request<void>(`/agents/${id}`, {
+        method: "DELETE",
         token,
       }),
   },
