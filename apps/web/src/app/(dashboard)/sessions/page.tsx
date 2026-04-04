@@ -262,7 +262,7 @@ export default function SessionsPage() {
                   onValueChange={handleAgentSelect}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="No preset — configure manually" />
+                    <SelectValue placeholder="No preset - configure manually" />
                   </SelectTrigger>
                   <SelectContent>
                     {presetsList.length === 0 ? (
@@ -278,7 +278,7 @@ export default function SessionsPage() {
                           {a.name}
                           {a.description && (
                             <span className="text-muted-foreground ml-2">
-                              — {a.description}
+                              - {a.description}
                             </span>
                           )}
                         </SelectItem>
@@ -352,7 +352,7 @@ export default function SessionsPage() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="None — plain bash terminal" />
+                    <SelectValue placeholder="None - plain bash terminal" />
                   </SelectTrigger>
                   <SelectContent>
                     {aiCredentials.map((c) => (
@@ -394,7 +394,7 @@ export default function SessionsPage() {
                         {env.name}
                         {env.description && (
                           <span className="text-muted-foreground ml-2">
-                            — {env.description}
+                            - {env.description}
                           </span>
                         )}
                       </SelectItem>
