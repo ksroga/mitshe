@@ -66,7 +66,16 @@ import {
 import { useSocket } from "@/lib/socket/socket-context";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/api/hooks";
-import type { SessionStatus } from "@/lib/api/types";
+import type { SessionStatus, AIProvider } from "@/lib/api/types";
+
+const providerLabels: Record<string, string> = {
+  CLAUDE: "Claude",
+  OPENAI: "OpenAI",
+  OPENROUTER: "OpenRouter",
+  GEMINI: "Gemini",
+  GROQ: "Groq",
+  CLAUDE_CODE_LOCAL: "Claude Code",
+};
 
 const statusConfig: Record<
   SessionStatus,
@@ -378,7 +387,7 @@ export default function SessionsPage() {
                           <span>{session.project.name}</span>
                         )}
                         {session.aiCredential && (
-                          <span>{session.aiCredential.provider}</span>
+                          <span>{providerLabels[session.aiCredential.provider] || session.aiCredential.provider}</span>
                         )}
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />

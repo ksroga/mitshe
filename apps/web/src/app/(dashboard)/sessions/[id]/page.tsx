@@ -32,6 +32,15 @@ import { toast } from "sonner";
 import type { SessionStatus } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
+const providerLabels: Record<string, string> = {
+  CLAUDE: "Claude",
+  OPENAI: "OpenAI",
+  OPENROUTER: "OpenRouter",
+  GEMINI: "Gemini",
+  GROQ: "Groq",
+  CLAUDE_CODE_LOCAL: "Claude Code",
+};
+
 // ─── File Tree ──────────────────────────────────────────────────────
 
 interface FileTreeNode {
@@ -393,7 +402,7 @@ export default function SessionDetailPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               {session.project?.name || "No project"}
-              {session.aiCredential && ` · ${session.aiCredential.provider}`}
+              {session.aiCredential && ` · ${providerLabels[session.aiCredential.provider] || session.aiCredential.provider}`}
             </p>
           </div>
         </div>
