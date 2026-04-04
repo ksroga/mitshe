@@ -85,7 +85,7 @@ export class SessionContainerService implements OnModuleInit {
         'mitshe.created-at': new Date().toISOString(),
       },
       HostConfig: {
-        Binds: ['mitshe-executor-home:/home/executor'],
+        Binds: [`mitshe-executor-home-${config.organizationId}:/home/executor`],
         Memory:
           (config.environment?.memoryMb || 4096) * 1024 * 1024,
         NanoCpus: (config.environment?.cpuCores || 2) * 1e9,
