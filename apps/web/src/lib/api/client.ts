@@ -30,6 +30,7 @@ import type {
   Repository,
   UpdateRepositoryDto,
   BulkUpdateRepositoriesDto,
+  RemoteRepository,
   SyncRepositoriesResult,
   SyncAllRepositoriesResult,
   WorkflowTemplateMetadata,
@@ -461,6 +462,25 @@ export const api = {
         method: "DELETE",
         token,
       }),
+
+    test: (id: string, token: string) =>
+      request<{ success: boolean; message: string }>(
+        `/ai-credentials/${id}/test`,
+        {
+          method: "POST",
+          token,
+        },
+      ),
+
+    testBeforeConnect: (
+      data: { provider: string; apiKey?: string },
+      token: string,
+    ) =>
+      request<{ success: boolean; message: string }>("/ai-credentials/test", {
+        method: "POST",
+        body: JSON.stringify(data),
+        token,
+      }),
   },
 
   repositories: {
@@ -493,17 +513,60 @@ export const api = {
         token,
       }),
 
+    bulkDelete: (ids: string[], token: string) =>
+      request<{ result: { deleted: number } }>("/repositories/bulk", {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+        token,
+      }),
+
     delete: (id: string, token: string) =>
       request<void>(`/repositories/${id}`, {
         method: "DELETE",
         token,
       }),
 
+    listRemote: (token: string) =>
+      request<{ repositories: RemoteRepository[] }>("/repositories/remote", {
+        token,
+      }),
+
+    syncExisting: (token: string) =>
+      request<{ result: SyncRepositoriesResult }>(
+        "/repositories/sync/existing",
+        {
+          method: "POST",
+          token,
+        },
+      ),
+
+    syncOne: (id: string, token: string) =>
+      request<{ synced: boolean; message: string }>(
+        `/repositories/${id}/sync`,
+        {
+          method: "POST",
+          token,
+        },
+      ),
+
     syncAll: (token: string) =>
-      request<SyncAllRepositoriesResult>("/repositories/sync", {
+      request<{ result: SyncAllRepositoriesResult }>("/repositories/sync", {
         method: "POST",
         token,
       }),
+
+    syncSelective: (
+      data: { integrationId: string; externalIds: string[] },
+      token: string,
+    ) =>
+      request<{ result: SyncRepositoriesResult }>(
+        "/repositories/sync/selective",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+          token,
+        },
+      ),
 
     syncIntegration: (integrationId: string, token: string) =>
       request<SyncRepositoriesResult>(`/repositories/sync/${integrationId}`, {

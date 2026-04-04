@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  FolderKanban,
   ListTodo,
   Workflow,
   History,
@@ -28,6 +29,12 @@ const coreNavItems = [
     href: "/dashboard",
     icon: LayoutDashboard,
     tourId: "nav-dashboard",
+  },
+  {
+    title: "Projects",
+    href: "/projects",
+    icon: FolderKanban,
+    tourId: "nav-projects",
   },
   {
     title: "Tasks",

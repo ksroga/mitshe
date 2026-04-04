@@ -830,6 +830,28 @@ export function useDeleteAICredential() {
   });
 }
 
+export function useTestAICredential() {
+  const getToken = useAuthToken();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      return api.aiCredentials.test(id, token);
+    },
+  });
+}
+
+export function useTestAICredentialBeforeConnect() {
+  const getToken = useAuthToken();
+
+  return useMutation({
+    mutationFn: async (data: { provider: string; apiKey?: string }) => {
+      const token = await getToken();
+      return api.aiCredentials.testBeforeConnect(data, token);
+    },
+  });
+}
+
 export function useRepositories(active?: boolean) {
   const getToken = useAuthToken();
 
@@ -922,6 +944,64 @@ export function useDeleteRepository() {
   });
 }
 
+export function useBulkDeleteRepositories() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const token = await getToken();
+      return api.repositories.bulkDelete(ids, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
+    },
+  });
+}
+
+export function useRemoteRepositories() {
+  const getToken = useAuthToken();
+
+  return useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      const { repositories } = await api.repositories.listRemote(token);
+      return repositories;
+    },
+  });
+}
+
+export function useSyncExistingRepositories() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      const response = await api.repositories.syncExisting(token);
+      return response.result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
+    },
+  });
+}
+
+export function useSyncOneRepository() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      return api.repositories.syncOne(id, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
+    },
+  });
+}
+
 export function useSyncRepositories() {
   const getToken = useAuthToken();
   const queryClient = useQueryClient();
@@ -932,7 +1012,26 @@ export function useSyncRepositories() {
       if (integrationId) {
         return api.repositories.syncIntegration(integrationId, token);
       }
-      return api.repositories.syncAll(token);
+      const response = await api.repositories.syncAll(token);
+      return response.result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
+    },
+  });
+}
+
+export function useSyncSelectiveRepositories() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      integrationId: string;
+      externalIds: string[];
+    }) => {
+      const token = await getToken();
+      return api.repositories.syncSelective(data, token);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });

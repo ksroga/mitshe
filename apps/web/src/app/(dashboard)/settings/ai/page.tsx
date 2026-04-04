@@ -45,6 +45,7 @@ import {
   EyeOff,
   Shield,
   Zap,
+  PlugZap,
 } from "lucide-react";
 import {
   AnthropicIcon,
@@ -58,6 +59,8 @@ import {
   useCreateAICredential,
   useUpdateAICredential,
   useDeleteAICredential,
+  useTestAICredential,
+  useTestAICredentialBeforeConnect,
 } from "@/lib/api/hooks";
 import { toast } from "sonner";
 import { AIProvider } from "@/lib/api/types";
@@ -110,6 +113,9 @@ export default function AICredentialsPage() {
   const updateCredential = useUpdateAICredential();
   const deleteCredential = useDeleteAICredential();
 
+  const testCredential = useTestAICredential();
+  const testBeforeConnect = useTestAICredentialBeforeConnect();
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -119,6 +125,19 @@ export default function AICredentialsPage() {
   });
 
   const isLocalProvider = addForm.provider === "CLAUDE_CODE_LOCAL";
+
+  const handleTestConnection = async (id: string) => {
+    try {
+      const result = await testCredential.mutateAsync(id);
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error("Failed to test connection");
+    }
+  };
 
   const handleAddCredential = async () => {
     if (!addForm.provider) {
@@ -132,6 +151,16 @@ export default function AICredentialsPage() {
     }
 
     try {
+      const testResult = await testBeforeConnect.mutateAsync({
+        provider: addForm.provider as AIProvider,
+        apiKey: isLocalProvider ? undefined : addForm.apiKey,
+      });
+
+      if (!testResult.success) {
+        toast.error(`Connection test failed: ${testResult.message}`);
+        return;
+      }
+
       await createCredential.mutateAsync({
         provider: addForm.provider as AIProvider,
         apiKey: isLocalProvider ? "local" : addForm.apiKey,
@@ -293,14 +322,16 @@ export default function AICredentialsPage() {
                 onClick={handleAddCredential}
                 disabled={
                   createCredential.isPending ||
+                  testBeforeConnect.isPending ||
                   !addForm.provider ||
                   (!isLocalProvider && !addForm.apiKey)
                 }
               >
-                {createCredential.isPending && (
+                {(createCredential.isPending ||
+                  testBeforeConnect.isPending) && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
-                Add Provider
+                {testBeforeConnect.isPending ? "Testing..." : "Add Provider"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -374,6 +405,20 @@ export default function AICredentialsPage() {
                       <Star className="w-3.5 h-3.5" />
                     </Button>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleTestConnection(credential.id)}
+                    disabled={testCredential.isPending}
+                    className="h-7 w-7"
+                    title="Test connection"
+                  >
+                    {testCredential.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <PlugZap className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
