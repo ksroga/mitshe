@@ -211,12 +211,15 @@ export default function SessionDetailPage() {
     }
   }, [wsStatus, refetch]);
 
-  // Refetch when processing completes
+  // Refetch with delay when processing completes (wait for DB save)
+  const prevProcessing = useRef(isProcessing);
   useEffect(() => {
-    if (!isProcessing && session?.messages?.length) {
-      refetch();
+    if (prevProcessing.current && !isProcessing) {
+      const timer = setTimeout(() => refetch(), 1000);
+      return () => clearTimeout(timer);
     }
-  }, [isProcessing]); // eslint-disable-line react-hooks/exhaustive-deps
+    prevProcessing.current = isProcessing;
+  }, [isProcessing, refetch]);
 
   const handleSend = async () => {
     const content = input.trim();
@@ -350,9 +353,9 @@ export default function SessionDetailPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* File Browser - Left Panel */}
-        <div className="w-60 border-r shrink-0 flex flex-col">
+        <div className="w-60 border-r shrink-0 flex flex-col overflow-hidden">
           <div className="px-3 py-2 border-b">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Files

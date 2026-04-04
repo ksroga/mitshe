@@ -224,10 +224,13 @@ export class SessionsController {
               { sessionId: id, event },
             );
 
-            // Accumulate assistant text
-            if (
-              event.type === 'assistant' &&
-              typeof event.message === 'string'
+            // Accumulate assistant text from various Claude event formats
+            if (typeof event.content === 'string' && event.content) {
+              fullResponse += event.content;
+            } else if (
+              typeof event.message === 'string' &&
+              event.message &&
+              event.type !== 'log'
             ) {
               fullResponse += event.message;
             } else if (
@@ -237,6 +240,11 @@ export class SessionsController {
               'text' in event.delta
             ) {
               fullResponse += (event.delta as any).text;
+            } else if (
+              event.type === 'result' &&
+              typeof event.result === 'string'
+            ) {
+              fullResponse += event.result;
             }
           },
         );
