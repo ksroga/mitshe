@@ -1228,6 +1228,17 @@ export function useReadSessionFile() {
   });
 }
 
+export function useDeleteSessionFile() {
+  const getToken = useAuthToken();
+
+  return useMutation({
+    mutationFn: async ({ id, path }: { id: string; path: string }) => {
+      const token = await getToken();
+      return api.sessions.deleteFile(id, path, token);
+    },
+  });
+}
+
 export function useWriteSessionFile() {
   const getToken = useAuthToken();
 

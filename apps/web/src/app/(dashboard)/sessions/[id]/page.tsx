@@ -21,6 +21,7 @@ import {
   useSessionFiles,
   useSessionGitStatus,
   useReadSessionFile,
+  useDeleteSessionFile,
   useWriteSessionFile,
 } from "@/lib/api/hooks";
 import { useSocket } from "@/lib/socket/socket-context";
@@ -55,6 +56,7 @@ export default function SessionDetailPage() {
   const resumeSession = useResumeSession();
   const stopSession = useStopSession();
   const readFile = useReadSessionFile();
+  const deleteFile = useDeleteSessionFile();
   const writeFile = useWriteSessionFile();
   const [resumedFromCompleted, setResumedFromCompleted] = useState(false);
 
@@ -184,12 +186,57 @@ export default function SessionDetailPage() {
         return next;
       });
 
-      // Switch to terminal if closing active tab
       if (activeTabId === tabId) {
         setActiveTabId(TERMINAL_TAB_ID);
       }
     },
     [activeTabId],
+  );
+
+  const handleCloseOtherTabs = useCallback(
+    (keepTabId: string) => {
+      const toClose = tabs.filter(
+        (t) => t.closeable && t.id !== keepTabId,
+      );
+      for (const t of toClose) {
+        setFileContents((prev) => {
+          const next = { ...prev };
+          delete next[t.id];
+          return next;
+        });
+      }
+      setTabs((prev) =>
+        prev.filter((t) => !t.closeable || t.id === keepTabId),
+      );
+      setActiveTabId(keepTabId);
+    },
+    [tabs],
+  );
+
+  const handleCloseAllFileTabs = useCallback(() => {
+    const fileTabIds = tabs.filter((t) => t.closeable).map((t) => t.id);
+    setTabs((prev) => prev.filter((t) => !t.closeable));
+    setFileContents((prev) => {
+      const next = { ...prev };
+      for (const id of fileTabIds) delete next[id];
+      return next;
+    });
+    setActiveTabId(TERMINAL_TAB_ID);
+  }, [tabs]);
+
+  const handleDeleteFile = useCallback(
+    async (relativePath: string) => {
+      if (!confirm(`Delete ${relativePath}?`)) return;
+      const fullPath = `/workspace/${relativePath}`;
+      try {
+        await deleteFile.mutateAsync({ id: sessionId, path: fullPath });
+        const tabId = `file:${relativePath}`;
+        handleTabClose(tabId);
+      } catch {
+        // ignore
+      }
+    },
+    [sessionId, deleteFile, handleTabClose],
   );
 
   const handlePause = async () => {
@@ -312,6 +359,7 @@ export default function SessionDetailPage() {
           basePath="/workspace"
           isLoading={isActive && files.length === 0}
           onFileClick={handleOpenFile}
+          onDelete={handleDeleteFile}
           gitStatuses={gitStatuses}
         />
 
@@ -323,6 +371,8 @@ export default function SessionDetailPage() {
             activeTabId={activeTabId}
             onTabClick={setActiveTabId}
             onTabClose={handleTabClose}
+            onCloseOthers={handleCloseOtherTabs}
+            onCloseAll={handleCloseAllFileTabs}
           />
 
           {/* Tab Content */}

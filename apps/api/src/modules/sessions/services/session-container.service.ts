@@ -228,58 +228,7 @@ export class SessionContainerService implements OnModuleInit {
    * Read a file from the container
    */
   async readFile(containerId: string, filePath: string): Promise<string> {
-    const container = this.docker.getContainer(containerId);
-
-    const exec = await container.exec({
-      Cmd: ['cat', filePath],
-      AttachStdout: true,
-      AttachStderr: true,
-      User: 'executor',
-      Tty: false,
-    });
-
-    return new Promise((resolve, reject) => {
-      exec.start({}, (err, stream) => {
-        if (err || !stream) {
-          reject(err || new Error('No stream'));
-          return;
-        }
-
-        let output = '';
-        let errorOutput = '';
-
-        stream.on('data', (chunk: Buffer) => {
-          // Non-TTY: demux multiplexed stream
-          let offset = 0;
-          while (offset < chunk.length) {
-            if (offset + 8 > chunk.length) {
-              output += chunk.slice(offset).toString('utf8');
-              break;
-            }
-            const type = chunk[offset];
-            const size = chunk.readUInt32BE(offset + 4);
-            if (offset + 8 + size > chunk.length) {
-              output += chunk.slice(offset).toString('utf8');
-              break;
-            }
-            const data = chunk.slice(offset + 8, offset + 8 + size).toString('utf8');
-            if (type === 1) output += data;
-            else if (type === 2) errorOutput += data;
-            offset += 8 + size;
-          }
-        });
-
-        stream.on('end', () => {
-          if (errorOutput && !output) {
-            reject(new Error(errorOutput.trim()));
-          } else {
-            resolve(output);
-          }
-        });
-
-        stream.on('error', reject);
-      });
-    });
+    return this.execCommand(containerId, ['cat', filePath]);
   }
 
   /**
@@ -327,9 +276,39 @@ export class SessionContainerService implements OnModuleInit {
   }
 
   /**
+   * Demux a Docker multiplexed stream buffer, returning stdout text.
+   * Handles partial frames across chunk boundaries.
+   */
+  private demuxBuffer(data: Buffer): string {
+    let output = '';
+    let offset = 0;
+
+    while (offset < data.length) {
+      // Need at least 8 bytes for the header
+      if (offset + 8 > data.length) break;
+
+      const type = data[offset];
+      const size = data.readUInt32BE(offset + 4);
+
+      // Need header + full payload
+      if (offset + 8 + size > data.length) break;
+
+      if (type === 1) {
+        // stdout
+        output += data.slice(offset + 8, offset + 8 + size).toString('utf8');
+      }
+      // type === 2 is stderr — skip
+
+      offset += 8 + size;
+    }
+
+    return output;
+  }
+
+  /**
    * Execute a command in the container and return stdout
    */
-  private async execCommand(
+  async execCommand(
     containerId: string,
     cmd: string[],
     workDir = '/workspace',
@@ -352,30 +331,9 @@ export class SessionContainerService implements OnModuleInit {
           return;
         }
 
-        let output = '';
-        stream.on('data', (chunk: Buffer) => {
-          let offset = 0;
-          while (offset < chunk.length) {
-            if (offset + 8 > chunk.length) {
-              output += chunk.slice(offset).toString('utf8');
-              break;
-            }
-            const type = chunk[offset];
-            const size = chunk.readUInt32BE(offset + 4);
-            if (offset + 8 + size > chunk.length) {
-              output += chunk.slice(offset).toString('utf8');
-              break;
-            }
-            if (type === 1) {
-              output += chunk
-                .slice(offset + 8, offset + 8 + size)
-                .toString('utf8');
-            }
-            offset += 8 + size;
-          }
-        });
-
-        stream.on('end', () => resolve(output));
+        const chunks: Buffer[] = [];
+        stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+        stream.on('end', () => resolve(this.demuxBuffer(Buffer.concat(chunks))));
         stream.on('error', () => resolve(''));
       });
     });
@@ -444,74 +402,28 @@ export class SessionContainerService implements OnModuleInit {
     containerId: string,
     basePath = '/workspace',
   ): Promise<string[]> {
-    const container = this.docker.getContainer(containerId);
+    const output = await this.execCommand(containerId, [
+      'find',
+      basePath,
+      '-type',
+      'f',
+      '-not',
+      '-path',
+      '*/node_modules/*',
+      '-not',
+      '-path',
+      '*/.git/*',
+      '-not',
+      '-path',
+      '*/.claude/*',
+      '-maxdepth',
+      '5',
+    ]);
 
-    const exec = await container.exec({
-      Cmd: [
-        'find',
-        basePath,
-        '-type',
-        'f',
-        '-not',
-        '-path',
-        '*/node_modules/*',
-        '-not',
-        '-path',
-        '*/.git/*',
-        '-not',
-        '-path',
-        '*/.claude/*',
-        '-maxdepth',
-        '5',
-      ],
-      AttachStdout: true,
-      AttachStderr: true,
-      User: 'executor',
-      Tty: false,
-    });
-
-    return new Promise((resolve) => {
-      exec.start({}, (err, stream) => {
-        if (err || !stream) {
-          resolve([]);
-          return;
-        }
-
-        let output = '';
-        stream.on('data', (chunk: Buffer) => {
-          // Non-TTY: demux multiplexed stream
-          let offset = 0;
-          while (offset < chunk.length) {
-            if (offset + 8 > chunk.length) {
-              output += chunk.slice(offset).toString('utf8');
-              break;
-            }
-            const type = chunk[offset];
-            const size = chunk.readUInt32BE(offset + 4);
-            if (offset + 8 + size > chunk.length) {
-              output += chunk.slice(offset).toString('utf8');
-              break;
-            }
-            if (type === 1) {
-              output += chunk
-                .slice(offset + 8, offset + 8 + size)
-                .toString('utf8');
-            }
-            offset += 8 + size;
-          }
-        });
-
-        stream.on('end', () => {
-          const files = output
-            .split('\n')
-            .map((f) => f.trim())
-            .filter(Boolean);
-          resolve(files);
-        });
-
-        stream.on('error', () => resolve([]));
-      });
-    });
+    return output
+      .split('\n')
+      .map((f) => f.trim())
+      .filter(Boolean);
   }
 
   /**

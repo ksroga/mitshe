@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   FileText,
   Folder,
@@ -88,7 +88,6 @@ export function buildFileTree(
   return toArray(root);
 }
 
-/** Check if a directory contains any git-changed files */
 function dirHasChanges(
   node: FileTreeNode,
   gitStatuses: Map<string, GitFileStatus>,
@@ -99,15 +98,87 @@ function dirHasChanges(
   );
 }
 
+function showContextMenu(
+  e: React.MouseEvent,
+  path: string,
+  type: "file" | "directory",
+  actions: FileTreeActions,
+) {
+  e.preventDefault();
+
+  const menu = document.createElement("div");
+  menu.className =
+    "fixed z-50 bg-popover border rounded-md shadow-md py-1 text-xs min-w-[180px]";
+  menu.style.left = `${e.clientX}px`;
+  menu.style.top = `${e.clientY}px`;
+
+  const items: Array<{
+    label: string;
+    action: () => void;
+    separator?: boolean;
+  }> = [];
+
+  if (type === "file") {
+    items.push({ label: "Open", action: () => actions.onFileClick(path) });
+  }
+
+  items.push({
+    label: "Copy Path",
+    action: () => navigator.clipboard.writeText(path),
+  });
+
+  items.push({
+    label: "Copy Full Path",
+    action: () => navigator.clipboard.writeText(`/workspace/${path}`),
+  });
+
+  if (actions.onDelete) {
+    items.push({
+      label: "Delete",
+      action: () => actions.onDelete!(path),
+      separator: true,
+    });
+  }
+
+  for (const item of items) {
+    if (item.separator) {
+      const sep = document.createElement("div");
+      sep.className = "border-t my-1";
+      menu.appendChild(sep);
+    }
+    const btn = document.createElement("button");
+    btn.className =
+      "w-full text-left px-3 py-1.5 hover:bg-muted text-popover-foreground";
+    btn.textContent = item.label;
+    btn.onclick = () => {
+      item.action();
+      menu.remove();
+    };
+    menu.appendChild(btn);
+  }
+
+  document.body.appendChild(menu);
+  const close = () => {
+    menu.remove();
+    document.removeEventListener("click", close);
+  };
+  setTimeout(() => document.addEventListener("click", close), 0);
+}
+
+export interface FileTreeActions {
+  onFileClick: (path: string) => void;
+  onDelete?: (path: string) => void;
+}
+
 function FileTreeItem({
   node,
   depth = 0,
-  onFileClick,
+  actions,
   gitStatuses,
 }: {
   node: FileTreeNode;
   depth?: number;
-  onFileClick: (path: string) => void;
+  actions: FileTreeActions;
   gitStatuses: Map<string, GitFileStatus>;
 }) {
   const [isOpen, setIsOpen] = useState(depth < 1);
@@ -116,6 +187,12 @@ function FileTreeItem({
   const colorClass = fileStatus ? gitStatusColors[fileStatus] : "";
   const hasChangedChildren =
     node.type === "directory" && dirHasChanges(node, gitStatuses);
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) =>
+      showContextMenu(e, node.path, node.type, actions),
+    [node.path, node.type, actions],
+  );
 
   if (node.type === "file") {
     return (
@@ -127,7 +204,8 @@ function FileTreeItem({
             : "text-muted-foreground hover:text-foreground",
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        onClick={() => onFileClick(node.path)}
+        onClick={() => actions.onFileClick(node.path)}
+        onContextMenu={handleContextMenu}
       >
         <FileText className="w-3.5 h-3.5 shrink-0" />
         <span className="truncate flex-1">{node.name}</span>
@@ -154,6 +232,7 @@ function FileTreeItem({
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => setIsOpen(!isOpen)}
+        onContextMenu={handleContextMenu}
       >
         {isOpen ? (
           <ChevronDown className="w-3.5 h-3.5 shrink-0" />
@@ -173,7 +252,7 @@ function FileTreeItem({
             key={child.path}
             node={child}
             depth={depth + 1}
-            onFileClick={onFileClick}
+            actions={actions}
             gitStatuses={gitStatuses}
           />
         ))}
@@ -186,12 +265,14 @@ export function FileTree({
   basePath,
   isLoading,
   onFileClick,
+  onDelete,
   gitStatuses,
 }: {
   files: string[];
   basePath: string;
   isLoading: boolean;
   onFileClick: (path: string) => void;
+  onDelete?: (path: string) => void;
   gitStatuses?: Array<{ path: string; status: string }>;
 }) {
   const fileTree = buildFileTree(files, basePath);
@@ -202,6 +283,8 @@ export function FileTree({
       statusMap.set(path, status as GitFileStatus);
     }
   }
+
+  const actions: FileTreeActions = { onFileClick, onDelete };
 
   return (
     <div className="w-60 border-r shrink-0 flex flex-col overflow-hidden min-h-0">
@@ -221,7 +304,7 @@ export function FileTree({
               <FileTreeItem
                 key={node.path}
                 node={node}
-                onFileClick={onFileClick}
+                actions={actions}
                 gitStatuses={statusMap}
               />
             ))

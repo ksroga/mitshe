@@ -365,6 +365,28 @@ export class SessionsController {
     return { path: filePath, content };
   }
 
+  @Delete(':id/file')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a file from session container' })
+  async deleteFile(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Query('path') filePath: string,
+  ) {
+    const session = await this.sessionsService.findOne(organizationId, id);
+
+    if (!session.containerId) {
+      throw new BadRequestException('Session has no container');
+    }
+
+    await this.containerService.execCommand(session.containerId, [
+      'rm',
+      '-f',
+      filePath,
+    ]);
+    return { status: 'deleted' };
+  }
+
   @Post(':id/file')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Write file content to session container' })

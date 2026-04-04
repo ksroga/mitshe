@@ -667,5 +667,14 @@ export const api = {
         body: JSON.stringify({ path, content }),
         token,
       }),
+
+    deleteFile: (id: string, path: string, token: string) =>
+      request<{ status: string }>(
+        `/sessions/${id}/file?path=${encodeURIComponent(path)}`,
+        {
+          method: "DELETE",
+          token,
+        },
+      ),
   },
 };
