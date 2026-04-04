@@ -317,6 +317,28 @@ export class SessionsController {
     return { files };
   }
 
+  @Get(':id/git-status')
+  @ApiOperation({ summary: 'Get git status for files in session container' })
+  async getGitStatus(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+  ) {
+    const session = await this.sessionsService.findOne(organizationId, id);
+
+    if (!session.containerId) return { statuses: [] };
+
+    if (
+      !(await this.containerService.isContainerRunning(session.containerId))
+    ) {
+      return { statuses: [] };
+    }
+
+    const statuses = await this.containerService.getGitStatus(
+      session.containerId,
+    );
+    return { statuses };
+  }
+
   @Get(':id/file')
   @ApiOperation({ summary: 'Read file content from session container' })
   async readFile(

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface FileTreeNode {
   name: string;
@@ -15,6 +16,32 @@ export interface FileTreeNode {
   type: "file" | "directory";
   children?: FileTreeNode[];
 }
+
+export type GitFileStatus =
+  | "modified"
+  | "added"
+  | "deleted"
+  | "renamed"
+  | "untracked"
+  | "changed";
+
+const gitStatusColors: Record<GitFileStatus, string> = {
+  modified: "text-yellow-500",
+  added: "text-green-500",
+  deleted: "text-red-500",
+  renamed: "text-blue-400",
+  untracked: "text-green-400",
+  changed: "text-yellow-400",
+};
+
+const gitStatusLetters: Record<GitFileStatus, string> = {
+  modified: "M",
+  added: "A",
+  deleted: "D",
+  renamed: "R",
+  untracked: "U",
+  changed: "C",
+};
 
 export function buildFileTree(
   paths: string[],
@@ -61,26 +88,59 @@ export function buildFileTree(
   return toArray(root);
 }
 
+/** Check if a directory contains any git-changed files */
+function dirHasChanges(
+  node: FileTreeNode,
+  gitStatuses: Map<string, GitFileStatus>,
+): boolean {
+  if (node.type === "file") return gitStatuses.has(node.path);
+  return (
+    node.children?.some((child) => dirHasChanges(child, gitStatuses)) ?? false
+  );
+}
+
 function FileTreeItem({
   node,
   depth = 0,
   onFileClick,
+  gitStatuses,
 }: {
   node: FileTreeNode;
   depth?: number;
   onFileClick: (path: string) => void;
+  gitStatuses: Map<string, GitFileStatus>;
 }) {
   const [isOpen, setIsOpen] = useState(depth < 1);
+
+  const fileStatus = gitStatuses.get(node.path);
+  const colorClass = fileStatus ? gitStatusColors[fileStatus] : "";
+  const hasChangedChildren =
+    node.type === "directory" && dirHasChanges(node, gitStatuses);
 
   if (node.type === "file") {
     return (
       <div
-        className="flex items-center gap-1.5 py-0.5 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded cursor-pointer"
+        className={cn(
+          "flex items-center gap-1.5 py-0.5 px-2 text-xs hover:bg-muted/50 rounded cursor-pointer",
+          fileStatus
+            ? colorClass
+            : "text-muted-foreground hover:text-foreground",
+        )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => onFileClick(node.path)}
       >
         <FileText className="w-3.5 h-3.5 shrink-0" />
-        <span className="truncate">{node.name}</span>
+        <span className="truncate flex-1">{node.name}</span>
+        {fileStatus && (
+          <span
+            className={cn(
+              "text-[10px] font-mono font-bold shrink-0",
+              colorClass,
+            )}
+          >
+            {gitStatusLetters[fileStatus]}
+          </span>
+        )}
       </div>
     );
   }
@@ -88,7 +148,10 @@ function FileTreeItem({
   return (
     <div>
       <div
-        className="flex items-center gap-1 py-0.5 px-2 text-xs font-medium hover:bg-muted/50 rounded cursor-pointer"
+        className={cn(
+          "flex items-center gap-1 py-0.5 px-2 text-xs font-medium hover:bg-muted/50 rounded cursor-pointer",
+          hasChangedChildren && "text-yellow-500",
+        )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -111,6 +174,7 @@ function FileTreeItem({
             node={child}
             depth={depth + 1}
             onFileClick={onFileClick}
+            gitStatuses={gitStatuses}
           />
         ))}
     </div>
@@ -122,13 +186,22 @@ export function FileTree({
   basePath,
   isLoading,
   onFileClick,
+  gitStatuses,
 }: {
   files: string[];
   basePath: string;
   isLoading: boolean;
   onFileClick: (path: string) => void;
+  gitStatuses?: Array<{ path: string; status: string }>;
 }) {
   const fileTree = buildFileTree(files, basePath);
+
+  const statusMap = new Map<string, GitFileStatus>();
+  if (gitStatuses) {
+    for (const { path, status } of gitStatuses) {
+      statusMap.set(path, status as GitFileStatus);
+    }
+  }
 
   return (
     <div className="w-60 border-r shrink-0 flex flex-col overflow-hidden min-h-0">
@@ -149,6 +222,7 @@ export function FileTree({
                 key={node.path}
                 node={node}
                 onFileClick={onFileClick}
+                gitStatuses={statusMap}
               />
             ))
           )}

@@ -1202,6 +1202,21 @@ export function useSessionFiles(id: string) {
   });
 }
 
+export function useSessionGitStatus(id: string) {
+  const getToken = useAuthToken();
+
+  return useQuery({
+    queryKey: [...queryKeys.sessions.detail(id), "git-status"],
+    queryFn: async () => {
+      const token = await getToken();
+      const { statuses } = await api.sessions.getGitStatus(id, token);
+      return statuses;
+    },
+    enabled: !!id,
+    refetchInterval: 5000,
+  });
+}
+
 export function useReadSessionFile() {
   const getToken = useAuthToken();
 

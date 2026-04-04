@@ -649,6 +649,12 @@ export const api = {
       });
     },
 
+    getGitStatus: (id: string, token: string) =>
+      request<{ statuses: Array<{ path: string; status: string }> }>(
+        `/sessions/${id}/git-status`,
+        { token },
+      ),
+
     readFile: (id: string, filePath: string, token: string) =>
       request<{ path: string; content: string }>(
         `/sessions/${id}/file?path=${encodeURIComponent(filePath)}`,

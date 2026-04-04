@@ -19,6 +19,7 @@ import {
   useResumeSession,
   useStopSession,
   useSessionFiles,
+  useSessionGitStatus,
   useReadSessionFile,
   useWriteSessionFile,
 } from "@/lib/api/hooks";
@@ -49,6 +50,7 @@ export default function SessionDetailPage() {
 
   const { data: session, isLoading, refetch } = useSession(sessionId);
   const { data: files = [] } = useSessionFiles(sessionId);
+  const { data: gitStatuses = [] } = useSessionGitStatus(sessionId);
   const pauseSession = usePauseSession();
   const resumeSession = useResumeSession();
   const stopSession = useStopSession();
@@ -310,6 +312,7 @@ export default function SessionDetailPage() {
           basePath="/workspace"
           isLoading={isActive && files.length === 0}
           onFileClick={handleOpenFile}
+          gitStatuses={gitStatuses}
         />
 
         {/* Editor / Terminal Area */}

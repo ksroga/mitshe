@@ -327,6 +327,117 @@ export class SessionContainerService implements OnModuleInit {
   }
 
   /**
+   * Execute a command in the container and return stdout
+   */
+  private async execCommand(
+    containerId: string,
+    cmd: string[],
+    workDir = '/workspace',
+  ): Promise<string> {
+    const container = this.docker.getContainer(containerId);
+
+    const exec = await container.exec({
+      Cmd: cmd,
+      AttachStdout: true,
+      AttachStderr: true,
+      User: 'executor',
+      WorkingDir: workDir,
+      Tty: false,
+    });
+
+    return new Promise((resolve) => {
+      exec.start({}, (err, stream) => {
+        if (err || !stream) {
+          resolve('');
+          return;
+        }
+
+        let output = '';
+        stream.on('data', (chunk: Buffer) => {
+          let offset = 0;
+          while (offset < chunk.length) {
+            if (offset + 8 > chunk.length) {
+              output += chunk.slice(offset).toString('utf8');
+              break;
+            }
+            const type = chunk[offset];
+            const size = chunk.readUInt32BE(offset + 4);
+            if (offset + 8 + size > chunk.length) {
+              output += chunk.slice(offset).toString('utf8');
+              break;
+            }
+            if (type === 1) {
+              output += chunk
+                .slice(offset + 8, offset + 8 + size)
+                .toString('utf8');
+            }
+            offset += 8 + size;
+          }
+        });
+
+        stream.on('end', () => resolve(output));
+        stream.on('error', () => resolve(''));
+      });
+    });
+  }
+
+  /**
+   * Get git status for files in workspace repos
+   */
+  async getGitStatus(
+    containerId: string,
+  ): Promise<Array<{ path: string; status: string }>> {
+    // Find all git repos in /workspace
+    const repoList = await this.execCommand(containerId, [
+      'find',
+      '/workspace',
+      '-maxdepth',
+      '2',
+      '-name',
+      '.git',
+      '-type',
+      'd',
+    ]);
+
+    const results: Array<{ path: string; status: string }> = [];
+
+    for (const gitDir of repoList.split('\n').filter(Boolean)) {
+      const repoDir = gitDir.replace('/.git', '');
+      const repoName = repoDir.replace('/workspace/', '');
+
+      const statusOutput = await this.execCommand(
+        containerId,
+        ['git', 'status', '--porcelain', '-uall'],
+        repoDir,
+      );
+
+      for (const line of statusOutput.split('\n').filter(Boolean)) {
+        const xy = line.substring(0, 2);
+        const file = line.substring(3);
+
+        let status: string;
+        if (xy[0] === '?' && xy[1] === '?') {
+          status = 'untracked';
+        } else if (xy[0] === 'A' || xy[1] === 'A') {
+          status = 'added';
+        } else if (xy[0] === 'M' || xy[1] === 'M') {
+          status = 'modified';
+        } else if (xy[0] === 'D' || xy[1] === 'D') {
+          status = 'deleted';
+        } else if (xy[0] === 'R') {
+          status = 'renamed';
+        } else {
+          status = 'changed';
+        }
+
+        results.push({ path: `${repoName}/${file}`, status });
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Get file tree from workspace
    */
   async getFileTree(
