@@ -272,8 +272,8 @@ export default function AICredentialsPage() {
                 <Alert>
                   <Zap className="w-4 h-4" />
                   <AlertDescription>
-                    No API key required. Uses your local Claude Code instance
-                    running on localhost.
+                    No API key required. This provider manages its own
+                    authentication — configure it in a terminal session.
                   </AlertDescription>
                 </Alert>
               ) : (
