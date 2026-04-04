@@ -12,6 +12,7 @@ import {
   BadRequestException,
   Req,
 } from '@nestjs/common';
+import * as path from 'path';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -53,6 +54,26 @@ export class SessionsController {
     private readonly encryption: EncryptionService,
     private readonly eventsGateway: EventsGateway,
   ) {}
+
+  /**
+   * Validate and resolve a file path to ensure it's under /workspace.
+   * Prevents path traversal attacks (e.g., ../../etc/passwd).
+   */
+  private validateFilePath(filePath: string): string {
+    const WORKSPACE = '/workspace';
+    // Resolve to absolute path relative to workspace
+    const resolved = filePath.startsWith('/')
+      ? path.resolve(filePath)
+      : path.resolve(WORKSPACE, filePath);
+
+    if (!resolved.startsWith(WORKSPACE + '/') && resolved !== WORKSPACE) {
+      throw new BadRequestException(
+        'Path must be within /workspace',
+      );
+    }
+
+    return resolved;
+  }
 
   // ─── Session CRUD ──────────────────────────────────────────────
 
@@ -423,9 +444,10 @@ export class SessionsController {
       return { files: [] };
     }
 
+    const safePath = path ? this.validateFilePath(path) : '/workspace';
     const files = await this.containerService.getFileTree(
       session.containerId,
-      path || '/workspace',
+      safePath,
     );
     return { files };
   }
@@ -467,11 +489,12 @@ export class SessionsController {
       throw new BadRequestException('Container is not running');
     }
 
+    const safePath = this.validateFilePath(filePath);
     const content = await this.containerService.readFile(
       session.containerId,
-      filePath,
+      safePath,
     );
-    return { path: filePath, content };
+    return { path: safePath, content };
   }
 
   @Delete(':id/file')
@@ -488,10 +511,11 @@ export class SessionsController {
       throw new BadRequestException('Session has no container');
     }
 
+    const safePath = this.validateFilePath(filePath);
     await this.containerService.execCommand(session.containerId, [
       'rm',
       '-f',
-      filePath,
+      safePath,
     ]);
     return { status: 'deleted' };
   }
@@ -513,9 +537,10 @@ export class SessionsController {
       throw new BadRequestException('Container is not running');
     }
 
+    const safePath = this.validateFilePath(body.path);
     await this.containerService.writeFile(
       session.containerId,
-      body.path,
+      safePath,
       body.content,
     );
     return { status: 'saved' };
