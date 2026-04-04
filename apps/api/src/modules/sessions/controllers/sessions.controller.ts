@@ -243,6 +243,40 @@ export class SessionsController {
     return { status: 'completed' };
   }
 
+  // ─── Command Execution (non-interactive, for workflows) ────────
+
+  @Post(':id/exec')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Execute command in session container (non-interactive)' })
+  async exec(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Body() body: { command: string; timeout?: number },
+  ) {
+    const session = await this.sessionsService.findOne(organizationId, id);
+
+    if (session.status !== 'RUNNING' && session.status !== 'PAUSED') {
+      throw new BadRequestException('Session is not running');
+    }
+
+    if (!session.containerId) {
+      throw new BadRequestException('Session has no container');
+    }
+
+    const startTime = Date.now();
+    const cmd = ['bash', '-c', body.command];
+    const stdout = await this.containerService.execCommand(
+      session.containerId,
+      cmd,
+    );
+
+    return {
+      stdout,
+      exitCode: 0,
+      duration: Date.now() - startTime,
+    };
+  }
+
   // ─── Terminal Management ───────────────────────────────────────
 
   @Post(':id/terminals')
