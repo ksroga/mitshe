@@ -532,7 +532,7 @@ export const api = {
       }),
 
     syncAll: (token: string) =>
-      request<SyncAllRepositoriesResult>("/repositories/sync", {
+      request<{ result: SyncAllRepositoriesResult }>("/repositories/sync", {
         method: "POST",
         token,
       }),

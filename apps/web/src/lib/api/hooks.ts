@@ -981,7 +981,8 @@ export function useSyncRepositories() {
       if (integrationId) {
         return api.repositories.syncIntegration(integrationId, token);
       }
-      return api.repositories.syncAll(token);
+      const response = await api.repositories.syncAll(token);
+      return response.result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
