@@ -62,6 +62,7 @@ import {
   useBulkUpdateRepositories,
   useBulkDeleteRepositories,
   useRemoteRepositories,
+  useSyncRepositories,
   useSyncSelectiveRepositories,
   useIntegrations,
 } from "@/lib/api/hooks";
@@ -85,6 +86,7 @@ export default function RepositoriesPage() {
   const bulkUpdate = useBulkUpdateRepositories();
   const bulkDelete = useBulkDeleteRepositories();
   const fetchRemoteRepos = useRemoteRepositories();
+  const syncRepositories = useSyncRepositories();
   const syncSelective = useSyncSelectiveRepositories();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -111,6 +113,23 @@ export default function RepositoriesPage() {
   const connectedIntegrations = gitIntegrations.filter(
     (i) => i.status === "CONNECTED",
   );
+
+  const handleSync = async () => {
+    try {
+      const result = await syncRepositories.mutateAsync(undefined);
+      if ("totalSynced" in result) {
+        toast.success(
+          `Synced ${result.totalSynced} of ${result.totalRepositories} repositories`,
+        );
+      } else {
+        toast.success(
+          `Synced ${result.synced} of ${result.total} repositories`,
+        );
+      }
+    } catch {
+      toast.error("Failed to sync repositories");
+    }
+  };
 
   const handleOpenSyncDialog = async () => {
     try {
@@ -295,17 +314,33 @@ export default function RepositoriesPage() {
             Manage Git repositories for your workflows
           </p>
         </div>
-        <Button
-          onClick={handleOpenSyncDialog}
-          disabled={fetchRemoteRepos.isPending || !hasGitIntegration}
-        >
-          {fetchRemoteRepos.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="w-4 h-4 mr-2" />
+        <div className="flex items-center gap-2">
+          {repositories.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleSync}
+              disabled={syncRepositories.isPending || !hasGitIntegration}
+            >
+              {syncRepositories.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Sync
+            </Button>
           )}
-          Import Repositories
-        </Button>
+          <Button
+            onClick={handleOpenSyncDialog}
+            disabled={fetchRemoteRepos.isPending || !hasGitIntegration}
+          >
+            {fetchRemoteRepos.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            Import
+          </Button>
+        </div>
       </div>
 
       {!hasGitIntegration && (
