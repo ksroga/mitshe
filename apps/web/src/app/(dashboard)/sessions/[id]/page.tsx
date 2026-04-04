@@ -554,17 +554,17 @@ export default function SessionDetailPage() {
                   >
                     <p className="font-semibold mb-1.5">Keyboard Shortcuts</p>
                     <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-                      <kbd className="bg-muted px-1 rounded text-[10px] font-mono">Ctrl+S</kbd>
+                      <kbd className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">Ctrl+S</kbd>
                       <span>Save file</span>
-                      <kbd className="bg-muted px-1 rounded text-[10px] font-mono">Ctrl+F</kbd>
+                      <kbd className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">Ctrl+F</kbd>
                       <span>Find in file</span>
-                      <kbd className="bg-muted px-1 rounded text-[10px] font-mono">Ctrl+H</kbd>
+                      <kbd className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">Ctrl+H</kbd>
                       <span>Find &amp; Replace</span>
-                      <kbd className="bg-muted px-1 rounded text-[10px] font-mono">Ctrl+G</kbd>
+                      <kbd className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">Ctrl+G</kbd>
                       <span>Go to line</span>
-                      <kbd className="bg-muted px-1 rounded text-[10px] font-mono">Ctrl+P</kbd>
+                      <kbd className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">Ctrl+P</kbd>
                       <span>Command palette</span>
-                      <kbd className="bg-muted px-1 rounded text-[10px] font-mono">Middle Click</kbd>
+                      <kbd className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">Middle Click</kbd>
                       <span>Close tab</span>
                     </div>
                   </TooltipContent>
