@@ -53,13 +53,18 @@ async function setup() {
         continue;
       }
 
-      log(`Cloning ${repo.name} from ${repo.cloneUrl}`);
+      log(`Cloning ${repo.name}`);
       try {
         const branch = repo.branch || 'main';
+        // Clone URL may contain auth token for push access
         execSync(
           `git clone --branch ${branch} --single-branch ${repo.cloneUrl} ${repoDir}`,
           { stdio: 'pipe', timeout: 120000 },
         );
+        // Store credentials so push works
+        execSync(`git -C ${repoDir} config credential.helper store`, {
+          stdio: 'pipe',
+        });
         log(`Cloned ${repo.name} successfully`);
       } catch (e) {
         logError(`Failed to clone ${repo.name}: ${e.message}`);

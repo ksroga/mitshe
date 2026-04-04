@@ -28,6 +28,7 @@ import {
 } from '../services/session-container.service';
 import { TerminalManagerService } from '../services/terminal-manager.service';
 import { PrismaService } from '../../../infrastructure/persistence/prisma/prisma.service';
+import { EncryptionService } from '../../../shared/encryption/encryption.service';
 import { EventsGateway } from '../../../infrastructure/websocket/events.gateway';
 import {
   CreateSessionDto,
@@ -49,6 +50,7 @@ export class SessionsController {
     private readonly containerService: SessionContainerService,
     private readonly terminalManager: TerminalManagerService,
     private readonly prisma: PrismaService,
+    private readonly encryption: EncryptionService,
     private readonly eventsGateway: EventsGateway,
   ) {}
 
@@ -69,11 +71,56 @@ export class SessionsController {
       dto,
     );
 
-    const repos = session.repositories.map((sr) => ({
-      name: sr.repository.name,
-      cloneUrl: sr.repository.cloneUrl,
-      branch: sr.repository.defaultBranch,
-    }));
+    // Build repo configs with authenticated clone URLs
+    const repos: Array<{
+      name: string;
+      cloneUrl: string;
+      branch: string;
+    }> = [];
+
+    for (const sr of session.repositories) {
+      let cloneUrl = sr.repository.cloneUrl;
+
+      // Try to get PAT from the repo's integration for authenticated access
+      try {
+        const integration = await this.prisma.integration.findFirst({
+          where: {
+            id: sr.repository.integrationId,
+            organizationId,
+          },
+        });
+
+        if (integration?.config && integration?.configIv) {
+          const config = this.encryption.decryptJson(
+            Buffer.from(integration.config),
+            Buffer.from(integration.configIv),
+          ) as Record<string, string>;
+
+          const token =
+            config.accessToken || config.apiToken || config.token;
+
+          if (token && cloneUrl.startsWith('https://')) {
+            // Inject token into clone URL
+            const url = new URL(cloneUrl);
+            if (sr.repository.provider === 'GITLAB') {
+              url.username = 'oauth2';
+              url.password = token;
+            } else {
+              url.username = token;
+            }
+            cloneUrl = url.toString();
+          }
+        }
+      } catch {
+        // Fall back to unauthenticated URL
+      }
+
+      repos.push({
+        name: sr.repository.name,
+        cloneUrl,
+        branch: sr.repository.defaultBranch,
+      });
+    }
 
     // Load environment if set
     let envConfig: SessionContainerConfig['environment'] | undefined;
