@@ -662,6 +662,16 @@ export class EventsGateway
       return { event: 'error', data: { message: 'Authentication required' } };
     }
 
+    // Verify client is subscribed to the session room (org ownership checked at subscribe time)
+    const sessionId = data.terminalId.split(':')[0];
+    const clientData = this.connectedClients.get(client.id);
+    if (!clientData?.rooms.has(`session:${sessionId}`)) {
+      return {
+        event: 'error',
+        data: { message: 'Not subscribed to this session' },
+      };
+    }
+
     this.terminalManager?.sendInput(data.terminalId, data.input);
   }
 
