@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Docker from 'dockerode';
-import { Duplex } from 'stream';
 
 export interface SessionContainerConfig {
   sessionId: string;
@@ -11,27 +10,16 @@ export interface SessionContainerConfig {
 }
 
 /**
- * Represents a running interactive Claude session inside a container.
- * The stream is a bidirectional PTY: write to send keystrokes, read to get terminal output.
+ * Manages Docker containers for agent sessions.
+ * Container lifecycle, file operations, git status.
+ * Terminal management is delegated to TerminalManagerService.
  */
-export interface InteractiveSession {
-  exec: Docker.Exec;
-  stream: Duplex;
-}
-
 @Injectable()
 export class SessionContainerService implements OnModuleInit {
   private readonly logger = new Logger(SessionContainerService.name);
   private docker: Docker;
   private readonly executorImage: string;
   private readonly containerPrefix = 'mitshe-session';
-
-  /** Active interactive sessions: sessionId → InteractiveSession */
-  private readonly activeSessions = new Map<string, InteractiveSession>();
-
-  /** Terminal output buffer per session (for reconnect) */
-  private readonly outputBuffers = new Map<string, string>();
-  private readonly MAX_BUFFER_SIZE = 512 * 1024; // 512KB
 
   constructor(private configService: ConfigService) {
     this.docker = new Docker();
@@ -44,9 +32,8 @@ export class SessionContainerService implements OnModuleInit {
     await this.cleanupStaleContainers();
   }
 
-  /**
-   * Create and start a session container
-   */
+  // ─── Container Lifecycle ────────────────────────────────────────
+
   async createAndStart(config: SessionContainerConfig): Promise<string> {
     const containerName = `${this.containerPrefix}-${config.sessionId}`;
 
@@ -62,7 +49,6 @@ export class SessionContainerService implements OnModuleInit {
     const container = await this.docker.createContainer({
       Image: this.executorImage,
       name: containerName,
-      // Start as root to fix volume permissions, then drop to executor
       User: 'root',
       Entrypoint: ['bash', '-c'],
       Cmd: [
@@ -77,11 +63,9 @@ export class SessionContainerService implements OnModuleInit {
         'mitshe.created-at': new Date().toISOString(),
       },
       HostConfig: {
-        // Shared volume for executor home — Claude Code auth persists
-        // across sessions (first session logs in, others reuse token)
         Binds: ['mitshe-executor-home:/home/executor'],
-        Memory: 4 * 1024 * 1024 * 1024, // 4GB
-        NanoCpus: 2 * 1e9, // 2 CPUs
+        Memory: 4 * 1024 * 1024 * 1024,
+        NanoCpus: 2 * 1e9,
         PidsLimit: 512,
         NetworkMode: 'bridge',
         SecurityOpt: ['no-new-privileges:true'],
@@ -100,140 +84,46 @@ export class SessionContainerService implements OnModuleInit {
     return containerId;
   }
 
-  /**
-   * Start an interactive Claude Code session inside the container.
-   * Returns a bidirectional PTY stream — write stdin, read stdout.
-   */
-  async startInteractiveSession(
-    sessionId: string,
-    containerId: string,
-    onData: (data: string) => void,
-    onEnd: () => void,
-    options?: { continue?: boolean },
-  ): Promise<void> {
-    // Kill previous session if exists
-    this.closeInteractiveSession(sessionId);
-
-    // Clear output buffer on restart (not reconnect)
-    if (options?.continue) {
-      this.outputBuffers.delete(sessionId);
-    }
-
-    const container = this.docker.getContainer(containerId);
-
-    const cmd = options?.continue ? ['claude', '--continue'] : ['claude'];
-
-    const exec = await container.exec({
-      Cmd: cmd,
-      AttachStdin: true,
-      AttachStdout: true,
-      AttachStderr: true,
-      Tty: true,
-      User: 'executor',
-      WorkingDir: '/workspace',
-      Env: [
-        'TERM=xterm-256color',
-        'COLUMNS=120',
-        'LINES=40',
-        'HOME=/home/executor',
-      ],
-    });
-
-    const stream: Duplex = await new Promise((resolve, reject) => {
-      exec.start(
-        { hijack: true, stdin: true, Tty: true },
-        (err, s) => {
-          if (err || !s) {
-            reject(err || new Error('No stream returned'));
-            return;
-          }
-          resolve(s);
-        },
-      );
-    });
-
-    this.activeSessions.set(sessionId, { exec, stream });
-
-    // Initialize buffer
-    if (!this.outputBuffers.has(sessionId)) {
-      this.outputBuffers.set(sessionId, '');
-    }
-
-    // Forward terminal output — TTY mode means no demuxing needed
-    stream.on('data', (chunk: Buffer) => {
-      const text = chunk.toString('utf8');
-
-      // Append to buffer (trim if too large)
-      let buf = (this.outputBuffers.get(sessionId) || '') + text;
-      if (buf.length > this.MAX_BUFFER_SIZE) {
-        buf = buf.slice(buf.length - this.MAX_BUFFER_SIZE);
+  async stopContainer(containerId: string): Promise<void> {
+    try {
+      const container = this.docker.getContainer(containerId);
+      await container.stop({ t: 5 });
+    } catch (err) {
+      if (!(err as any).statusCode || (err as any).statusCode !== 304) {
+        this.logger.warn(
+          `Failed to stop container: ${(err as Error).message}`,
+        );
       }
-      this.outputBuffers.set(sessionId, buf);
-
-      onData(text);
-    });
-
-    stream.on('end', () => {
-      this.activeSessions.delete(sessionId);
-      onEnd();
-    });
-
-    stream.on('error', (err) => {
-      this.logger.warn(`Session ${sessionId} stream error: ${err.message}`);
-      this.activeSessions.delete(sessionId);
-      onEnd();
-    });
-
-    this.logger.log(`Interactive Claude session started for ${sessionId}`);
+    }
   }
 
-  /**
-   * Send raw terminal input (keystrokes) to the interactive session
-   */
-  sendInput(sessionId: string, data: string): boolean {
-    const session = this.activeSessions.get(sessionId);
-    if (!session) return false;
-
+  async removeContainer(containerId: string): Promise<void> {
     try {
-      session.stream.write(data);
-      return true;
+      const container = this.docker.getContainer(containerId);
+      await container.remove({ force: true });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to remove container: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  async isContainerRunning(containerId: string): Promise<boolean> {
+    try {
+      const container = this.docker.getContainer(containerId);
+      const info = await container.inspect();
+      return info.State.Running === true;
     } catch {
       return false;
     }
   }
 
-  /**
-   * Get buffered terminal output (for reconnect)
-   */
-  getOutputBuffer(sessionId: string): string {
-    return this.outputBuffers.get(sessionId) || '';
-  }
+  // ─── File Operations ────────────────────────────────────────────
 
-  /**
-   * Close the interactive session stream
-   */
-  closeInteractiveSession(sessionId: string): void {
-    const session = this.activeSessions.get(sessionId);
-    if (session) {
-      try {
-        session.stream.end();
-      } catch {
-        // ignore
-      }
-      this.activeSessions.delete(sessionId);
-    }
-  }
-
-  /**
-   * Read a file from the container
-   */
   async readFile(containerId: string, filePath: string): Promise<string> {
     return this.execCommand(containerId, ['cat', filePath]);
   }
 
-  /**
-   * Write content to a file in the container
-   */
   async writeFile(
     containerId: string,
     filePath: string,
@@ -241,7 +131,6 @@ export class SessionContainerService implements OnModuleInit {
   ): Promise<void> {
     const container = this.docker.getContainer(containerId);
 
-    // Use tee to write file content via stdin
     const exec = await container.exec({
       Cmd: ['tee', filePath],
       AttachStdin: true,
@@ -268,136 +157,6 @@ export class SessionContainerService implements OnModuleInit {
     });
   }
 
-  /**
-   * Check if there's an active interactive session
-   */
-  hasActiveSession(sessionId: string): boolean {
-    return this.activeSessions.has(sessionId);
-  }
-
-  /**
-   * Demux a Docker multiplexed stream buffer, returning stdout text.
-   * Handles partial frames across chunk boundaries.
-   */
-  private demuxBuffer(data: Buffer): string {
-    let output = '';
-    let offset = 0;
-
-    while (offset < data.length) {
-      // Need at least 8 bytes for the header
-      if (offset + 8 > data.length) break;
-
-      const type = data[offset];
-      const size = data.readUInt32BE(offset + 4);
-
-      // Need header + full payload
-      if (offset + 8 + size > data.length) break;
-
-      if (type === 1) {
-        // stdout
-        output += data.slice(offset + 8, offset + 8 + size).toString('utf8');
-      }
-      // type === 2 is stderr — skip
-
-      offset += 8 + size;
-    }
-
-    return output;
-  }
-
-  /**
-   * Execute a command in the container and return stdout
-   */
-  async execCommand(
-    containerId: string,
-    cmd: string[],
-    workDir = '/workspace',
-  ): Promise<string> {
-    const container = this.docker.getContainer(containerId);
-
-    const exec = await container.exec({
-      Cmd: cmd,
-      AttachStdout: true,
-      AttachStderr: true,
-      User: 'executor',
-      WorkingDir: workDir,
-      Tty: false,
-    });
-
-    return new Promise((resolve) => {
-      exec.start({}, (err, stream) => {
-        if (err || !stream) {
-          resolve('');
-          return;
-        }
-
-        const chunks: Buffer[] = [];
-        stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-        stream.on('end', () => resolve(this.demuxBuffer(Buffer.concat(chunks))));
-        stream.on('error', () => resolve(''));
-      });
-    });
-  }
-
-  /**
-   * Get git status for files in workspace repos
-   */
-  async getGitStatus(
-    containerId: string,
-  ): Promise<Array<{ path: string; status: string }>> {
-    // Find all git repos in /workspace
-    const repoList = await this.execCommand(containerId, [
-      'find',
-      '/workspace',
-      '-maxdepth',
-      '2',
-      '-name',
-      '.git',
-      '-type',
-      'd',
-    ]);
-
-    const results: Array<{ path: string; status: string }> = [];
-
-    for (const gitDir of repoList.split('\n').filter(Boolean)) {
-      const repoDir = gitDir.replace('/.git', '');
-      const repoName = repoDir.replace('/workspace/', '');
-
-      const statusOutput = await this.execCommand(
-        containerId,
-        ['git', 'status', '--porcelain', '-uall'],
-        repoDir,
-      );
-
-      for (const line of statusOutput.split('\n').filter(Boolean)) {
-        const xy = line.substring(0, 2);
-        const file = line.substring(3);
-
-        let status: string;
-        if (xy[0] === '?' && xy[1] === '?') {
-          status = 'untracked';
-        } else if (xy[0] === 'A' || xy[1] === 'A') {
-          status = 'added';
-        } else if (xy[0] === 'M' || xy[1] === 'M') {
-          status = 'modified';
-        } else if (xy[0] === 'D' || xy[1] === 'D') {
-          status = 'deleted';
-        } else if (xy[0] === 'R') {
-          status = 'renamed';
-        } else {
-          status = 'changed';
-        }
-
-        results.push({ path: `${repoName}/${file}`, status });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * Get file tree from workspace
-   */
   async getFileTree(
     containerId: string,
     basePath = '/workspace',
@@ -426,54 +185,104 @@ export class SessionContainerService implements OnModuleInit {
       .filter(Boolean);
   }
 
-  /**
-   * Stop a container
-   */
-  async stopContainer(containerId: string): Promise<void> {
-    try {
-      const container = this.docker.getContainer(containerId);
-      await container.stop({ t: 5 });
-      this.logger.log(`Container stopped: ${containerId.slice(0, 12)}`);
-    } catch (err) {
-      if (!(err as any).statusCode || (err as any).statusCode !== 304) {
-        this.logger.warn(
-          `Failed to stop container ${containerId.slice(0, 12)}: ${(err as Error).message}`,
-        );
+  async getGitStatus(
+    containerId: string,
+  ): Promise<Array<{ path: string; status: string }>> {
+    const repoList = await this.execCommand(containerId, [
+      'find',
+      '/workspace',
+      '-maxdepth',
+      '2',
+      '-name',
+      '.git',
+      '-type',
+      'd',
+    ]);
+
+    const results: Array<{ path: string; status: string }> = [];
+
+    for (const gitDir of repoList.split('\n').filter(Boolean)) {
+      const repoDir = gitDir.replace('/.git', '');
+      const repoName = repoDir.replace('/workspace/', '');
+
+      const statusOutput = await this.execCommand(
+        containerId,
+        ['git', 'status', '--porcelain', '-uall'],
+        repoDir,
+      );
+
+      for (const line of statusOutput.split('\n').filter(Boolean)) {
+        const xy = line.substring(0, 2);
+        const file = line.substring(3);
+
+        let status: string;
+        if (xy[0] === '?' && xy[1] === '?') status = 'untracked';
+        else if (xy[0] === 'A' || xy[1] === 'A') status = 'added';
+        else if (xy[0] === 'M' || xy[1] === 'M') status = 'modified';
+        else if (xy[0] === 'D' || xy[1] === 'D') status = 'deleted';
+        else if (xy[0] === 'R') status = 'renamed';
+        else status = 'changed';
+
+        results.push({ path: `${repoName}/${file}`, status });
       }
     }
+
+    return results;
   }
 
-  /**
-   * Remove a container
-   */
-  async removeContainer(containerId: string): Promise<void> {
-    try {
-      const container = this.docker.getContainer(containerId);
-      await container.remove({ force: true });
-      this.logger.log(`Container removed: ${containerId.slice(0, 12)}`);
-    } catch (err) {
-      this.logger.warn(
-        `Failed to remove container ${containerId.slice(0, 12)}: ${(err as Error).message}`,
-      );
-    }
+  // ─── Exec Helper ────────────────────────────────────────────────
+
+  async execCommand(
+    containerId: string,
+    cmd: string[],
+    workDir = '/workspace',
+  ): Promise<string> {
+    const container = this.docker.getContainer(containerId);
+
+    const exec = await container.exec({
+      Cmd: cmd,
+      AttachStdout: true,
+      AttachStderr: true,
+      User: 'executor',
+      WorkingDir: workDir,
+      Tty: false,
+    });
+
+    return new Promise((resolve) => {
+      exec.start({}, (err, stream) => {
+        if (err || !stream) {
+          resolve('');
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+        stream.on('end', () => {
+          const data = Buffer.concat(chunks);
+          // Demux Docker multiplexed stream
+          let output = '';
+          let offset = 0;
+          while (offset < data.length) {
+            if (offset + 8 > data.length) break;
+            const type = data[offset];
+            const size = data.readUInt32BE(offset + 4);
+            if (offset + 8 + size > data.length) break;
+            if (type === 1) {
+              output += data
+                .slice(offset + 8, offset + 8 + size)
+                .toString('utf8');
+            }
+            offset += 8 + size;
+          }
+          resolve(output);
+        });
+        stream.on('error', () => resolve(''));
+      });
+    });
   }
 
-  /**
-   * Check if a container is running
-   */
-  async isContainerRunning(containerId: string): Promise<boolean> {
-    try {
-      const container = this.docker.getContainer(containerId);
-      const info = await container.inspect();
-      return info.State.Running === true;
-    } catch {
-      return false;
-    }
-  }
+  // ─── Cleanup ────────────────────────────────────────────────────
 
-  /**
-   * Cleanup stale session containers (older than 48h)
-   */
   private async cleanupStaleContainers(): Promise<void> {
     try {
       const containers = await this.docker.listContainers({
@@ -488,14 +297,14 @@ export class SessionContainerService implements OnModuleInit {
         const createdAt = containerInfo.Labels['mitshe.created-at'];
         if (createdAt && now - new Date(createdAt).getTime() > maxAge) {
           this.logger.log(
-            `Cleaning up stale session container: ${containerInfo.Names[0]}`,
+            `Cleaning up stale container: ${containerInfo.Names[0]}`,
           );
           await this.removeContainer(containerInfo.Id);
         }
       }
     } catch (err) {
       this.logger.warn(
-        `Failed to cleanup stale containers: ${(err as Error).message}`,
+        `Failed to cleanup: ${(err as Error).message}`,
       );
     }
   }

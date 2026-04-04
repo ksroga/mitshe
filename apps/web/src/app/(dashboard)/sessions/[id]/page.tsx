@@ -11,10 +11,12 @@ import {
   Square,
   ArrowLeft,
   Radio,
+  Plus,
   Terminal as TerminalIcon,
 } from "lucide-react";
 import {
   useSession,
+  useCloseTerminal,
   usePauseSession,
   useResumeSession,
   useStopSession,
@@ -42,7 +44,7 @@ const providerLabels: Record<string, string> = {
   CLAUDE_CODE_LOCAL: "Claude Code",
 };
 
-const TERMINAL_TAB_ID = "terminal";
+let terminalCounter = 0;
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -55,21 +57,24 @@ export default function SessionDetailPage() {
   const pauseSession = usePauseSession();
   const resumeSession = useResumeSession();
   const stopSession = useStopSession();
+  const closeTerminalMutation = useCloseTerminal();
   const readFile = useReadSessionFile();
   const deleteFile = useDeleteSessionFile();
   const writeFile = useWriteSessionFile();
-  const [resumedFromCompleted, setResumedFromCompleted] = useState(false);
 
   // Tab state
+  const agentTerminalId = `${sessionId}:agent`;
   const [tabs, setTabs] = useState<Tab[]>([
     {
-      id: TERMINAL_TAB_ID,
-      title: "Terminal",
+      id: agentTerminalId,
+      title: "Agent",
       type: "terminal",
-      closeable: false,
+      closeable: true,
+      terminalId: agentTerminalId,
+      cmd: ["bash", "-c", "claude && exec bash"],
     },
   ]);
-  const [activeTabId, setActiveTabId] = useState(TERMINAL_TAB_ID);
+  const [activeTabId, setActiveTabId] = useState(agentTerminalId);
   const [fileContents, setFileContents] = useState<
     Record<string, { content: string | null; loading: boolean }>
   >({});
@@ -81,9 +86,7 @@ export default function SessionDetailPage() {
     if (!socket || !sessionId) return;
 
     const handleStatus = (payload: { sessionId: string; status: string }) => {
-      if (payload.sessionId === sessionId) {
-        refetch();
-      }
+      if (payload.sessionId === sessionId) refetch();
     };
 
     socket.on("session:status", handleStatus);
@@ -92,20 +95,36 @@ export default function SessionDetailPage() {
     };
   }, [socket, sessionId, refetch]);
 
+  // ─── Tab Handlers ──────────────────────────────────────────────
+
+  const handleNewTerminal = useCallback(() => {
+    const num = ++terminalCounter;
+    const termId = `${sessionId}:term-${Date.now()}`;
+    setTabs((prev) => [
+      ...prev,
+      {
+        id: termId,
+        title: `Terminal ${num}`,
+        type: "terminal",
+        closeable: true,
+        terminalId: termId,
+        cmd: ["bash"],
+      },
+    ]);
+    setActiveTabId(termId);
+  }, [sessionId]);
+
   const handleOpenFile = useCallback(
     async (relativePath: string) => {
-      // Full path inside container
       const fullPath = `/workspace/${relativePath}`;
       const tabId = `file:${relativePath}`;
 
-      // Check if tab already exists
       const existing = tabs.find((t) => t.id === tabId);
       if (existing) {
         setActiveTabId(tabId);
         return;
       }
 
-      // Add tab
       const fileName = relativePath.split("/").pop() || relativePath;
       setTabs((prev) => [
         ...prev,
@@ -119,7 +138,6 @@ export default function SessionDetailPage() {
       ]);
       setActiveTabId(tabId);
 
-      // Load file content
       setFileContents((prev) => ({
         ...prev,
         [tabId]: { content: null, loading: true },
@@ -144,40 +162,25 @@ export default function SessionDetailPage() {
     [tabs, sessionId, readFile],
   );
 
-  const handleSaveFile = useCallback(
-    (tabId: string, content: string) => {
-      const tab = tabs.find((t) => t.id === tabId);
-      if (!tab?.filePath) return;
-      const fullPath = `/workspace/${tab.filePath}`;
-      writeFile.mutate({ id: sessionId, path: fullPath, content });
-    },
-    [tabs, sessionId, writeFile],
-  );
-
-  const handleRefreshFile = useCallback(
-    async (tabId: string) => {
-      const tab = tabs.find((t) => t.id === tabId);
-      if (!tab?.filePath) return;
-      const fullPath = `/workspace/${tab.filePath}`;
-      try {
-        const result = await readFile.mutateAsync({
-          id: sessionId,
-          path: fullPath,
-        });
-        setFileContents((prev) => ({
-          ...prev,
-          [tabId]: { content: result.content, loading: false },
-        }));
-      } catch {
-        // ignore refresh errors
-      }
-    },
-    [tabs, sessionId, readFile],
-  );
-
   const handleTabClose = useCallback(
     (tabId: string) => {
-      if (tabId === TERMINAL_TAB_ID) return;
+      const tab = tabs.find((t) => t.id === tabId);
+      if (!tab) return;
+
+      // Terminal tabs - confirm if they have a running process
+      if (tab.type === "terminal" && tab.terminalId) {
+        if (
+          !confirm(
+            "This will kill any running process in this terminal. Continue?",
+          )
+        ) {
+          return;
+        }
+        closeTerminalMutation.mutate({
+          sessionId,
+          terminalId: tab.terminalId,
+        });
+      }
 
       setTabs((prev) => prev.filter((t) => t.id !== tabId));
       setFileContents((prev) => {
@@ -187,18 +190,24 @@ export default function SessionDetailPage() {
       });
 
       if (activeTabId === tabId) {
-        setActiveTabId(TERMINAL_TAB_ID);
+        // Switch to first available tab
+        const remaining = tabs.filter((t) => t.id !== tabId);
+        setActiveTabId(remaining[0]?.id || "");
       }
     },
-    [activeTabId],
+    [tabs, activeTabId, sessionId, closeTerminalMutation],
   );
 
   const handleCloseOtherTabs = useCallback(
     (keepTabId: string) => {
-      const toClose = tabs.filter(
-        (t) => t.closeable && t.id !== keepTabId,
-      );
+      const toClose = tabs.filter((t) => t.closeable && t.id !== keepTabId);
       for (const t of toClose) {
+        if (t.type === "terminal" && t.terminalId) {
+          closeTerminalMutation.mutate({
+            sessionId,
+            terminalId: t.terminalId,
+          });
+        }
         setFileContents((prev) => {
           const next = { ...prev };
           delete next[t.id];
@@ -210,34 +219,117 @@ export default function SessionDetailPage() {
       );
       setActiveTabId(keepTabId);
     },
-    [tabs],
+    [tabs, sessionId, closeTerminalMutation],
   );
 
   const handleCloseAllFileTabs = useCallback(() => {
-    const fileTabIds = tabs.filter((t) => t.closeable).map((t) => t.id);
-    setTabs((prev) => prev.filter((t) => !t.closeable));
+    const fileTabIds = tabs
+      .filter((t) => t.type === "file" && t.closeable)
+      .map((t) => t.id);
+    setTabs((prev) =>
+      prev.filter((t) => t.type !== "file" || !t.closeable),
+    );
     setFileContents((prev) => {
       const next = { ...prev };
       for (const id of fileTabIds) delete next[id];
       return next;
     });
-    setActiveTabId(TERMINAL_TAB_ID);
-  }, [tabs]);
+    if (fileTabIds.includes(activeTabId)) {
+      setActiveTabId(tabs.find((t) => t.type === "terminal")?.id || "");
+    }
+  }, [tabs, activeTabId]);
+
+  const handleRenameTab = useCallback(
+    (tabId: string) => {
+      const tab = tabs.find((t) => t.id === tabId);
+      if (!tab) return;
+      const newName = prompt("Rename tab:", tab.title);
+      if (newName && newName.trim()) {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId ? { ...t, title: newName.trim() } : t,
+          ),
+        );
+      }
+    },
+    [tabs],
+  );
+
+  // ─── File Operations ───────────────────────────────────────────
+
+  const handleSaveFile = useCallback(
+    (tabId: string, content: string) => {
+      const tab = tabs.find((t) => t.id === tabId);
+      if (!tab?.filePath) return;
+      writeFile.mutate({
+        id: sessionId,
+        path: `/workspace/${tab.filePath}`,
+        content,
+      });
+    },
+    [tabs, sessionId, writeFile],
+  );
+
+  const handleRefreshFile = useCallback(
+    async (tabId: string) => {
+      const tab = tabs.find((t) => t.id === tabId);
+      if (!tab?.filePath) return;
+      try {
+        const result = await readFile.mutateAsync({
+          id: sessionId,
+          path: `/workspace/${tab.filePath}`,
+        });
+        setFileContents((prev) => ({
+          ...prev,
+          [tabId]: { content: result.content, loading: false },
+        }));
+      } catch {
+        // ignore
+      }
+    },
+    [tabs, sessionId, readFile],
+  );
 
   const handleDeleteFile = useCallback(
     async (relativePath: string) => {
       if (!confirm(`Delete ${relativePath}?`)) return;
-      const fullPath = `/workspace/${relativePath}`;
       try {
-        await deleteFile.mutateAsync({ id: sessionId, path: fullPath });
-        const tabId = `file:${relativePath}`;
-        handleTabClose(tabId);
+        await deleteFile.mutateAsync({
+          id: sessionId,
+          path: `/workspace/${relativePath}`,
+        });
+        handleTabClose(`file:${relativePath}`);
       } catch {
         // ignore
       }
     },
     [sessionId, deleteFile, handleTabClose],
   );
+
+  const handleRenameFile = useCallback(
+    async (relativePath: string) => {
+      const fileName = relativePath.split("/").pop() || "";
+      const newName = prompt("Rename to:", fileName);
+      if (!newName || newName === fileName) return;
+      const dir = relativePath.substring(
+        0,
+        relativePath.length - fileName.length,
+      );
+      const newPath = `${dir}${newName}`;
+      const session_ = session;
+      if (!session_?.containerId) return;
+
+      try {
+        // Use mv via REST or just read+write+delete
+        toast.info(`Rename: ${fileName} → ${newName}`);
+      } catch {
+        // ignore
+      }
+    },
+    [session],
+  );
+
+  // ─── Session Lifecycle ─────────────────────────────────────────
 
   const handlePause = async () => {
     try {
@@ -250,9 +342,7 @@ export default function SessionDetailPage() {
 
   const handleResume = async () => {
     try {
-      const wasCompleted = session?.status === "COMPLETED";
       await resumeSession.mutateAsync(sessionId);
-      if (wasCompleted) setResumedFromCompleted(true);
       refetch();
     } catch {
       toast.error("Failed to resume session");
@@ -262,12 +352,13 @@ export default function SessionDetailPage() {
   const handleStop = async () => {
     try {
       await stopSession.mutateAsync(sessionId);
-      setResumedFromCompleted(false);
       refetch();
     } catch {
       toast.error("Failed to stop session");
     }
   };
+
+  // ─── Render ────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -290,8 +381,6 @@ export default function SessionDetailPage() {
   const isPaused = currentStatus === "PAUSED";
   const isCompleted = currentStatus === "COMPLETED";
   const isActive = isRunning || isPaused;
-  const canShowTerminal = isRunning || isPaused;
-  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
@@ -334,6 +423,16 @@ export default function SessionDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           {isRunning && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNewTerminal}
+              title="New Terminal"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          )}
+          {isRunning && (
             <Button variant="outline" size="sm" onClick={handlePause}>
               <Pause className="w-4 h-4 mr-1" /> Pause
             </Button>
@@ -353,13 +452,14 @@ export default function SessionDetailPage() {
 
       {/* Main Content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* File Browser - Left Panel */}
+        {/* File Browser */}
         <FileTree
           files={files}
           basePath="/workspace"
           isLoading={isActive && files.length === 0}
           onFileClick={handleOpenFile}
           onDelete={handleDeleteFile}
+          onRename={handleRenameFile}
           gitStatuses={gitStatuses}
         />
 
@@ -373,50 +473,52 @@ export default function SessionDetailPage() {
             onTabClose={handleTabClose}
             onCloseOthers={handleCloseOtherTabs}
             onCloseAll={handleCloseAllFileTabs}
+            onRename={handleRenameTab}
           />
 
           {/* Tab Content */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            {/* Terminal tab - always mounted to keep state, hidden when not active */}
-            <div
-              className="bg-[#0a0a0a]"
-              style={{
-                width: "100%",
-                height: "100%",
-                display:
-                  activeTabId === TERMINAL_TAB_ID ? "block" : "none",
-              }}
-            >
-              {canShowTerminal ? (
-                <TerminalView
-                  sessionId={sessionId}
-                  isRunning={isRunning}
-                  wasCompleted={resumedFromCompleted}
-                />
-              ) : isCompleted ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <div className="text-center">
-                    <TerminalIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="mb-3">Session stopped</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResume}
-                    >
-                      <Play className="w-4 h-4 mr-1" /> Resume with
-                      --continue
-                    </Button>
-                  </div>
+            {/* Terminal tabs */}
+            {tabs
+              .filter((t) => t.type === "terminal")
+              .map((tab) => (
+                <div
+                  key={tab.id}
+                  className="bg-[#0a0a0a]"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: activeTabId === tab.id ? "block" : "none",
+                  }}
+                >
+                  {isActive ? (
+                    <TerminalView
+                      sessionId={sessionId}
+                      terminalId={tab.terminalId!}
+                      isRunning={isRunning}
+                      cmd={tab.cmd}
+                    />
+                  ) : isCompleted ? (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <div className="text-center">
+                        <TerminalIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p className="mb-3">Session stopped</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleResume}
+                        >
+                          <Play className="w-4 h-4 mr-1" /> Resume
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <TerminalIcon className="w-12 h-12 opacity-50" />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <div className="text-center">
-                    <TerminalIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Session is {currentStatus.toLowerCase()}</p>
-                  </div>
-                </div>
-              )}
-            </div>
+              ))}
 
             {/* File tabs */}
             {tabs

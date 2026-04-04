@@ -1117,27 +1117,36 @@ export function useStartTerminal() {
 
   return useMutation({
     mutationFn: async ({
-      id,
-      continueSession,
+      sessionId,
+      terminalId,
+      cmd,
     }: {
-      id: string;
-      continueSession?: boolean;
+      sessionId: string;
+      terminalId?: string;
+      cmd?: string[];
     }) => {
       const token = await getToken();
-      return api.sessions.startTerminal(id, token, {
-        continue: continueSession,
+      return api.sessions.startTerminal(sessionId, token, {
+        terminalId,
+        cmd,
       });
     },
   });
 }
 
-export function useSendInput() {
+export function useCloseTerminal() {
   const getToken = useAuthToken();
 
   return useMutation({
-    mutationFn: async ({ id, input }: { id: string; input: string }) => {
+    mutationFn: async ({
+      sessionId,
+      terminalId,
+    }: {
+      sessionId: string;
+      terminalId: string;
+    }) => {
       const token = await getToken();
-      return api.sessions.sendInput(id, input, token);
+      return api.sessions.closeTerminal(sessionId, terminalId, token);
     },
   });
 }

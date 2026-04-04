@@ -14,7 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { verifyToken } from '@clerk/backend';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../persistence/prisma/prisma.service';
-import { SessionContainerService } from '../../modules/sessions/services/session-container.service';
+import { TerminalManagerService } from '../../modules/sessions/services/terminal-manager.service';
 
 // Event type definitions
 export interface TaskUpdatePayload {
@@ -98,7 +98,7 @@ export class EventsGateway
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-    @Optional() private readonly sessionContainerService?: SessionContainerService,
+    @Optional() private readonly terminalManager?: TerminalManagerService,
   ) {
     this.clerkSecretKey =
       this.configService.get<string>('CLERK_SECRET_KEY') || '';
@@ -658,22 +658,23 @@ export class EventsGateway
   @SubscribeMessage('session:input')
   handleSessionInput(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { sessionId: string; input: string },
+    @MessageBody() data: { terminalId: string; input: string },
   ) {
     if (!this.isClientAuthenticated(client)) {
       return { event: 'error', data: { message: 'Authentication required' } };
     }
 
-    // Forward input directly to the container's stdin
-    this.sessionContainerService?.sendInput(data.sessionId, data.input);
+    this.terminalManager?.sendInput(data.terminalId, data.input);
   }
 
   /**
-   * Emit terminal output for a session
+   * Emit terminal output (routed by terminalId)
    */
-  emitSessionOutput(sessionId: string, output: string) {
+  emitSessionOutput(terminalId: string, output: string) {
+    // terminalId format: "sessionId:term-xxx"
+    const sessionId = terminalId.split(':')[0];
     this.server.to(`session:${sessionId}`).emit('session:output', {
-      sessionId,
+      terminalId,
       data: output,
     });
   }

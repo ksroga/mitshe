@@ -609,20 +609,25 @@ export const api = {
     startTerminal: (
       id: string,
       token: string,
-      options?: { continue?: boolean },
+      options?: { terminalId?: string; cmd?: string[] },
     ) =>
-      request<{ status: string; buffer?: string }>(`/sessions/${id}/terminal`, {
-        method: "POST",
-        body: options ? JSON.stringify(options) : undefined,
-        token,
-      }),
+      request<{ terminalId: string; status: string; buffer?: string }>(
+        `/sessions/${id}/terminals`,
+        {
+          method: "POST",
+          body: options ? JSON.stringify(options) : undefined,
+          token,
+        },
+      ),
 
-    sendInput: (id: string, input: string, token: string) =>
-      request<{ status: string }>(`/sessions/${id}/input`, {
-        method: "POST",
-        body: JSON.stringify({ input }),
-        token,
-      }),
+    closeTerminal: (id: string, terminalId: string, token: string) =>
+      request<{ status: string }>(
+        `/sessions/${id}/terminals/${encodeURIComponent(terminalId)}`,
+        {
+          method: "DELETE",
+          token,
+        },
+      ),
 
     pause: (id: string, token: string) =>
       request<{ status: string }>(`/sessions/${id}/pause`, {

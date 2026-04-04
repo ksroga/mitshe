@@ -121,11 +121,18 @@ function showFileContextMenu(
     action: () => navigator.clipboard.writeText(`/workspace/${path}`),
   });
 
+  if (actions.onRename) {
+    items.push({
+      label: "Rename",
+      action: () => actions.onRename!(path),
+      separator: true,
+    });
+  }
+
   if (actions.onDelete) {
     items.push({
       label: "Delete",
       action: () => actions.onDelete!(path),
-      separator: true,
       destructive: true,
     });
   }
@@ -136,6 +143,7 @@ function showFileContextMenu(
 export interface FileTreeActions {
   onFileClick: (path: string) => void;
   onDelete?: (path: string) => void;
+  onRename?: (path: string) => void;
 }
 
 function FileTreeItem({
@@ -234,6 +242,7 @@ export function FileTree({
   isLoading,
   onFileClick,
   onDelete,
+  onRename,
   gitStatuses,
 }: {
   files: string[];
@@ -241,6 +250,7 @@ export function FileTree({
   isLoading: boolean;
   onFileClick: (path: string) => void;
   onDelete?: (path: string) => void;
+  onRename?: (path: string) => void;
   gitStatuses?: Array<{ path: string; status: string }>;
 }) {
   const fileTree = buildFileTree(files, basePath);
@@ -252,7 +262,7 @@ export function FileTree({
     }
   }
 
-  const actions: FileTreeActions = { onFileClick, onDelete };
+  const actions: FileTreeActions = { onFileClick, onDelete, onRename };
 
   return (
     <div className="w-60 border-r shrink-0 flex flex-col overflow-hidden min-h-0">

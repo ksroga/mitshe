@@ -9,8 +9,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  Req,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,6 +23,7 @@ import { Request } from 'express';
 import { SessionStatus } from '@prisma/client';
 import { SessionsService } from '../services/sessions.service';
 import { SessionContainerService } from '../services/session-container.service';
+import { TerminalManagerService } from '../services/terminal-manager.service';
 import { PrismaService } from '../../../infrastructure/persistence/prisma/prisma.service';
 import { EventsGateway } from '../../../infrastructure/websocket/events.gateway';
 import {
@@ -43,9 +44,12 @@ export class SessionsController {
   constructor(
     private readonly sessionsService: SessionsService,
     private readonly containerService: SessionContainerService,
+    private readonly terminalManager: TerminalManagerService,
     private readonly prisma: PrismaService,
     private readonly eventsGateway: EventsGateway,
   ) {}
+
+  // ─── Session CRUD ──────────────────────────────────────────────
 
   @Post()
   @ApiOperation({ summary: 'Create and start a new agent session' })
@@ -56,21 +60,18 @@ export class SessionsController {
     @Req() req: Request,
   ) {
     const userId = (req as any).userId || 'system';
-
     const session = await this.sessionsService.create(
       organizationId,
       userId,
       dto,
     );
 
-    // Build repo configs
     const repos = session.repositories.map((sr) => ({
       name: sr.repository.name,
       cloneUrl: sr.repository.cloneUrl,
       branch: sr.repository.defaultBranch,
     }));
 
-    // Start container in background
     setImmediate(async () => {
       try {
         const containerId = await this.containerService.createAndStart({
@@ -135,14 +136,14 @@ export class SessionsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete agent session and stop container' })
+  @ApiOperation({ summary: 'Delete session and stop container' })
   async remove(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
   ) {
     const session = await this.sessionsService.findOne(organizationId, id);
 
-    this.containerService.closeInteractiveSession(id);
+    this.terminalManager.closeByPrefix(`${id}:`);
 
     if (session.containerId) {
       await this.containerService.stopContainer(session.containerId);
@@ -152,77 +153,11 @@ export class SessionsController {
     await this.sessionsService.remove(organizationId, id);
   }
 
-  @Post(':id/terminal')
-  @ApiOperation({ summary: 'Start or reconnect interactive Claude Code terminal' })
-  @ApiResponse({ status: 200 })
-  async startTerminal(
-    @OrganizationId() organizationId: string,
-    @Param('id') id: string,
-    @Body() body?: { continue?: boolean },
-  ) {
-    const session = await this.sessionsService.findOne(organizationId, id);
-
-    if (session.status !== 'RUNNING') {
-      throw new BadRequestException('Session is not running');
-    }
-
-    if (!session.containerId) {
-      throw new BadRequestException('Session has no container');
-    }
-
-    // Already has an active claude process — just return buffer for reconnect
-    if (this.containerService.hasActiveSession(id)) {
-      const buffer = this.containerService.getOutputBuffer(id);
-      return { status: 'already_active', buffer };
-    }
-
-    // Start new claude process (with --continue if resuming after stop)
-    const shouldContinue = body?.continue === true;
-
-    await this.containerService.startInteractiveSession(
-      id,
-      session.containerId,
-      (data) => {
-        this.eventsGateway.emitSessionOutput(id, data);
-      },
-      () => {
-        this.eventsGateway.emitSessionOutput(
-          id,
-          '\r\n[Claude Code exited]\r\n',
-        );
-      },
-      { continue: shouldContinue },
-    );
-
-    const buffer = this.containerService.getOutputBuffer(id);
-    return { status: 'started', buffer };
-  }
-
-  /**
-   * Send terminal input (called from WebSocket handler or REST)
-   */
-  @Post(':id/input')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send input to the terminal session' })
-  async sendInput(
-    @OrganizationId() organizationId: string,
-    @Param('id') id: string,
-    @Body() body: { input: string },
-  ) {
-    await this.sessionsService.findOne(organizationId, id);
-
-    const sent = this.containerService.sendInput(id, body.input);
-    if (!sent) {
-      throw new BadRequestException('No active terminal session');
-    }
-
-    await this.sessionsService.touchLastActive(id);
-    return { status: 'sent' };
-  }
+  // ─── Session Lifecycle ─────────────────────────────────────────
 
   @Post(':id/pause')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Pause agent session (freezes state, container stays alive)' })
+  @ApiOperation({ summary: 'Pause session (terminals keep running)' })
   async pause(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
@@ -232,8 +167,6 @@ export class SessionsController {
       throw new BadRequestException('Can only pause a running session');
     }
 
-    // Don't close the interactive session — claude process keeps running.
-    // We just change status so frontend knows to disconnect its view.
     await this.sessionsService.updateStatus(id, 'PAUSED');
     this.eventsGateway.emitSessionStatus(organizationId, id, 'PAUSED');
     return { status: 'paused' };
@@ -249,22 +182,16 @@ export class SessionsController {
     const session = await this.sessionsService.findOne(organizationId, id);
 
     if (session.status !== 'PAUSED' && session.status !== 'COMPLETED') {
-      throw new BadRequestException('Can only resume a paused or completed session');
-    }
-
-    if (!session.containerId) {
-      throw new BadRequestException('Session has no container');
-    }
-
-    // Check if container is still running
-    const containerRunning = await this.containerService.isContainerRunning(
-      session.containerId,
-    );
-
-    if (!containerRunning) {
       throw new BadRequestException(
-        'Container is no longer running. Delete this session and create a new one.',
+        'Can only resume a paused or completed session',
       );
+    }
+
+    if (
+      !session.containerId ||
+      !(await this.containerService.isContainerRunning(session.containerId))
+    ) {
+      throw new BadRequestException('Container is no longer running');
     }
 
     await this.sessionsService.updateStatus(id, 'RUNNING');
@@ -274,7 +201,7 @@ export class SessionsController {
 
   @Post(':id/stop')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Stop claude process (container stays for resume with --continue)' })
+  @ApiOperation({ summary: 'Stop all terminals (container stays for resume)' })
   async stop(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
@@ -284,17 +211,98 @@ export class SessionsController {
       throw new BadRequestException('Session is already stopped');
     }
 
-    // Close the claude process but keep the container alive
-    this.containerService.closeInteractiveSession(id);
+    this.terminalManager.closeByPrefix(`${id}:`);
 
-    // Keep containerId — needed for resume with --continue
     await this.sessionsService.updateStatus(id, 'COMPLETED');
     this.eventsGateway.emitSessionStatus(organizationId, id, 'COMPLETED');
     return { status: 'completed' };
   }
 
+  // ─── Terminal Management ───────────────────────────────────────
+
+  @Post(':id/terminals')
+  @ApiOperation({ summary: 'Start a new terminal in the session' })
+  async startTerminal(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Body() body?: { terminalId?: string; cmd?: string[] },
+  ) {
+    const session = await this.sessionsService.findOne(organizationId, id);
+
+    if (session.status !== 'RUNNING') {
+      throw new BadRequestException('Session is not running');
+    }
+
+    if (!session.containerId) {
+      throw new BadRequestException('Session has no container');
+    }
+
+    const terminalId =
+      body?.terminalId || `${id}:term-${Date.now()}`;
+    const cmd = body?.cmd || ['bash'];
+
+    // Already active — return buffer for reconnect
+    if (this.terminalManager.isActive(terminalId)) {
+      const buffer = this.terminalManager.getBuffer(terminalId);
+      return { terminalId, status: 'already_active', buffer };
+    }
+
+    await this.terminalManager.start(
+      terminalId,
+      session.containerId,
+      (data) => {
+        this.eventsGateway.emitSessionOutput(terminalId, data);
+      },
+      () => {
+        this.eventsGateway.emitSessionOutput(
+          terminalId,
+          '\r\n\x1b[90m[Process exited]\x1b[0m\r\n',
+        );
+      },
+      { cmd },
+    );
+
+    const buffer = this.terminalManager.getBuffer(terminalId);
+    return { terminalId, status: 'started', buffer };
+  }
+
+  @Delete(':id/terminals/:terminalId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Close a terminal' })
+  async closeTerminal(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Param('terminalId') terminalId: string,
+  ) {
+    await this.sessionsService.findOne(organizationId, id);
+    this.terminalManager.close(terminalId);
+    return { status: 'closed' };
+  }
+
+  @Post(':id/terminals/:terminalId/input')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send input to a terminal' })
+  async sendTerminalInput(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Param('terminalId') terminalId: string,
+    @Body() body: { input: string },
+  ) {
+    await this.sessionsService.findOne(organizationId, id);
+
+    const sent = this.terminalManager.sendInput(terminalId, body.input);
+    if (!sent) {
+      throw new BadRequestException('Terminal not active');
+    }
+
+    await this.sessionsService.touchLastActive(id);
+    return { status: 'sent' };
+  }
+
+  // ─── File Operations ───────────────────────────────────────────
+
   @Get(':id/files')
-  @ApiOperation({ summary: 'Get file tree from session container' })
+  @ApiOperation({ summary: 'Get file tree' })
   async getFiles(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
@@ -302,9 +310,8 @@ export class SessionsController {
   ) {
     const session = await this.sessionsService.findOne(organizationId, id);
 
-    if (!session.containerId) return { files: [] };
-
     if (
+      !session.containerId ||
       !(await this.containerService.isContainerRunning(session.containerId))
     ) {
       return { files: [] };
@@ -318,16 +325,15 @@ export class SessionsController {
   }
 
   @Get(':id/git-status')
-  @ApiOperation({ summary: 'Get git status for files in session container' })
+  @ApiOperation({ summary: 'Get git status' })
   async getGitStatus(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
   ) {
     const session = await this.sessionsService.findOne(organizationId, id);
 
-    if (!session.containerId) return { statuses: [] };
-
     if (
+      !session.containerId ||
       !(await this.containerService.isContainerRunning(session.containerId))
     ) {
       return { statuses: [] };
@@ -340,7 +346,7 @@ export class SessionsController {
   }
 
   @Get(':id/file')
-  @ApiOperation({ summary: 'Read file content from session container' })
+  @ApiOperation({ summary: 'Read file content' })
   async readFile(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
@@ -348,11 +354,8 @@ export class SessionsController {
   ) {
     const session = await this.sessionsService.findOne(organizationId, id);
 
-    if (!session.containerId) {
-      throw new BadRequestException('Session has no container');
-    }
-
     if (
+      !session.containerId ||
       !(await this.containerService.isContainerRunning(session.containerId))
     ) {
       throw new BadRequestException('Container is not running');
@@ -367,7 +370,7 @@ export class SessionsController {
 
   @Delete(':id/file')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a file from session container' })
+  @ApiOperation({ summary: 'Delete a file' })
   async deleteFile(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
@@ -389,7 +392,7 @@ export class SessionsController {
 
   @Post(':id/file')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Write file content to session container' })
+  @ApiOperation({ summary: 'Write file content' })
   async writeFile(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
@@ -397,11 +400,8 @@ export class SessionsController {
   ) {
     const session = await this.sessionsService.findOne(organizationId, id);
 
-    if (!session.containerId) {
-      throw new BadRequestException('Session has no container');
-    }
-
     if (
+      !session.containerId ||
       !(await this.containerService.isContainerRunning(session.containerId))
     ) {
       throw new BadRequestException('Container is not running');

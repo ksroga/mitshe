@@ -6,12 +6,14 @@ import { useStartTerminal } from "@/lib/api/hooks";
 
 export function TerminalView({
   sessionId,
+  terminalId,
   isRunning,
-  wasCompleted,
+  cmd,
 }: {
   sessionId: string;
+  terminalId: string;
   isRunning: boolean;
-  wasCompleted: boolean;
+  cmd?: string[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<HTMLDivElement>(null);
@@ -21,7 +23,7 @@ export function TerminalView({
   const startTerminal = useStartTerminal();
   const [terminalReady, setTerminalReady] = useState(false);
 
-  // Initialize xterm after container is measured
+  // Initialize xterm
   useEffect(() => {
     if (!termRef.current || !containerRef.current) return;
 
@@ -33,11 +35,8 @@ export function TerminalView({
       await new Promise<void>((resolve) => {
         const check = () => {
           const rect = containerRef.current?.getBoundingClientRect();
-          if (rect && rect.height > 50 && rect.width > 50) {
-            resolve();
-          } else {
-            requestAnimationFrame(check);
-          }
+          if (rect && rect.height > 50 && rect.width > 50) resolve();
+          else requestAnimationFrame(check);
         };
         check();
       });
@@ -46,7 +45,7 @@ export function TerminalView({
 
       const { Terminal } = await import("@xterm/xterm");
       const { FitAddon } = await import("@xterm/addon-fit");
-      // @ts-expect-error CSS import for xterm styles
+      // @ts-expect-error CSS import
       await import("@xterm/xterm/css/xterm.css");
 
       if (disposed) return;
@@ -125,18 +124,20 @@ export function TerminalView({
 
     const observer = new ResizeObserver(handleResize);
     observer.observe(containerRef.current);
-
     return () => observer.disconnect();
   }, [terminalReady]);
 
-  // Subscribe to session output
+  // Subscribe to terminal output
   useEffect(() => {
     if (!socket || !sessionId || !terminalReady) return;
 
     subscribeToSession(sessionId);
 
-    const handleOutput = (payload: { sessionId: string; data: string }) => {
-      if (payload.sessionId === sessionId && xtermRef.current) {
+    const handleOutput = (payload: {
+      terminalId: string;
+      data: string;
+    }) => {
+      if (payload.terminalId === terminalId && xtermRef.current) {
         xtermRef.current.write(payload.data);
       }
     };
@@ -144,47 +145,43 @@ export function TerminalView({
     socket.on("session:output", handleOutput);
 
     return () => {
-      unsubscribeFromSession(sessionId);
       socket.off("session:output", handleOutput);
     };
   }, [
     socket,
     sessionId,
+    terminalId,
     terminalReady,
     subscribeToSession,
     unsubscribeFromSession,
   ]);
 
-  // Forward keyboard input
+  // Forward keyboard input via WebSocket
   useEffect(() => {
     if (!xtermRef.current || !socket || !isRunning) return;
 
     const disposable = xtermRef.current.onData((data: string) => {
-      socket.emit("session:input", { sessionId, input: data });
+      socket.emit("session:input", { terminalId, input: data });
     });
 
     return () => disposable.dispose();
-  }, [terminalReady, socket, sessionId, isRunning]);
+  }, [terminalReady, socket, terminalId, isRunning]);
 
-  // Start terminal session
+  // Start terminal process
   useEffect(() => {
     if (!terminalReady || !isRunning) return;
 
-    if (wasCompleted && xtermRef.current) {
-      xtermRef.current.clear();
-    }
-
     startTerminal
-      .mutateAsync({ id: sessionId, continueSession: wasCompleted })
-      .then((res: any) => {
-        if (!wasCompleted && res.buffer && xtermRef.current) {
+      .mutateAsync({ sessionId, terminalId, cmd })
+      .then((res) => {
+        if (res.buffer && xtermRef.current) {
           xtermRef.current.write(res.buffer);
         }
       })
       .catch(() => {
         // ignore
       });
-  }, [terminalReady, isRunning, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [terminalReady, isRunning, sessionId, terminalId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div

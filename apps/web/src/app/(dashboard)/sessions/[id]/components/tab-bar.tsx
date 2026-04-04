@@ -9,6 +9,8 @@ export interface Tab {
   title: string;
   type: "terminal" | "file";
   filePath?: string;
+  terminalId?: string;
+  cmd?: string[];
   closeable: boolean;
 }
 
@@ -19,6 +21,7 @@ export function TabBar({
   onTabClose,
   onCloseOthers,
   onCloseAll,
+  onRename,
 }: {
   tabs: Tab[];
   activeTabId: string;
@@ -26,6 +29,7 @@ export function TabBar({
   onTabClose: (id: string) => void;
   onCloseOthers?: (id: string) => void;
   onCloseAll?: () => void;
+  onRename?: (id: string) => void;
 }) {
   return (
     <div className="flex items-center border-b bg-background overflow-x-auto shrink-0">
@@ -77,6 +81,14 @@ export function TabBar({
                   action: () => onCloseOthers(tab.id),
                 });
               }
+            }
+
+            if (onRename) {
+              items.push({
+                label: "Rename",
+                action: () => onRename(tab.id),
+                separator: true,
+              });
             }
 
             if (onCloseAll) {
