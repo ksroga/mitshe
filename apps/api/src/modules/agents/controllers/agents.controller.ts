@@ -22,9 +22,9 @@ import { AuthGuard } from '@/shared/auth';
 import { OrganizationId } from '../../../shared/decorators/organization.decorator';
 import { ApiRateLimit } from '../../../shared/decorators/throttle.decorator';
 
-@ApiTags('Agents')
+@ApiTags('Presets')
 @ApiBearerAuth('bearer')
-@Controller('api/v1/agents')
+@Controller('api/v1/presets')
 @UseGuards(AuthGuard)
 @ApiRateLimit()
 export class AgentsController {

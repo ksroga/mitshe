@@ -59,7 +59,7 @@ import {
   useSessions,
   useCreateSession,
   useDeleteSession,
-  useAgents,
+  usePresets,
   useProjects,
   useRepositories,
   useAICredentials,
@@ -121,7 +121,7 @@ export default function SessionsPage() {
     if (!urlProjectId) return sessions;
     return sessions.filter((s) => s.projectId === urlProjectId);
   }, [sessions, urlProjectId]);
-  const { data: agents = [] } = useAgents();
+  const { data: presetsList = [] } = usePresets();
   const { data: projects = [] } = useProjects();
   const { data: repositories = [] } = useRepositories();
   const { data: aiCredentials = [] } = useAICredentials();
@@ -150,7 +150,7 @@ export default function SessionsPage() {
   });
 
   const handleAgentSelect = (agentId: string) => {
-    const agent = agents.find((a) => a.id === agentId);
+    const agent = presetsList.find((a) => a.id === agentId);
     if (!agent) {
       setForm((prev) => ({ ...prev, agentDefinitionId: "" }));
       return;
@@ -250,24 +250,24 @@ export default function SessionsPage() {
             </DialogHeader>
             <DialogBody className="space-y-4 py-4 overflow-y-auto">
               <div className="space-y-2">
-                <Label>Agent (optional)</Label>
+                <Label>Preset (optional)</Label>
                 <Select
                   value={form.agentDefinitionId}
                   onValueChange={handleAgentSelect}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="No agent — configure manually" />
+                    <SelectValue placeholder="No preset — configure manually" />
                   </SelectTrigger>
                   <SelectContent>
-                    {agents.length === 0 ? (
+                    {presetsList.length === 0 ? (
                       <div className="px-3 py-2 text-sm text-muted-foreground">
-                        No agents defined.{" "}
-                        <a href="/agents" className="underline">
+                        No presets defined.{" "}
+                        <a href="/presets" className="underline">
                           Create one
                         </a>
                       </div>
                     ) : (
-                      agents.map((a) => (
+                      presetsList.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
                           {a.name}
                           {a.description && (

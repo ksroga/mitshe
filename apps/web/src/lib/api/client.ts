@@ -581,29 +581,29 @@ export const api = {
       }),
   },
 
-  agents: {
+  presets: {
     list: (token: string) =>
-      request<{ agents: AgentDefinition[] }>("/agents", { token }),
+      request<{ agents: AgentDefinition[] }>("/presets", { token }),
 
     get: (id: string, token: string) =>
-      request<{ agent: AgentDefinition }>(`/agents/${id}`, { token }),
+      request<{ agent: AgentDefinition }>(`/presets/${id}`, { token }),
 
     create: (data: CreateAgentDefinitionDto, token: string) =>
-      request<{ agent: AgentDefinition }>("/agents", {
+      request<{ agent: AgentDefinition }>("/presets", {
         method: "POST",
         body: JSON.stringify(data),
         token,
       }),
 
     update: (id: string, data: UpdateAgentDefinitionDto, token: string) =>
-      request<{ agent: AgentDefinition }>(`/agents/${id}`, {
+      request<{ agent: AgentDefinition }>(`/presets/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
         token,
       }),
 
     delete: (id: string, token: string) =>
-      request<void>(`/agents/${id}`, {
+      request<void>(`/presets/${id}`, {
         method: "DELETE",
         token,
       }),

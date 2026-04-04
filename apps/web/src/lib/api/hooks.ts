@@ -80,10 +80,10 @@ export const queryKeys = {
     detail: (id: string) =>
       [...queryKeys.repositories.all, "detail", id] as const,
   },
-  agents: {
-    all: ["agents"] as const,
-    list: () => [...queryKeys.agents.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.agents.all, "detail", id] as const,
+  presets: {
+    all: ["presets"] as const,
+    list: () => [...queryKeys.presets.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.presets.all, "detail", id] as const,
   },
   sessions: {
     all: ["sessions"] as const,
@@ -1278,36 +1278,36 @@ export function useWriteSessionFile() {
 // Agents
 // =========================================================================
 
-export function useAgents() {
+export function usePresets() {
   const getToken = useAuthToken();
 
   return useQuery({
-    queryKey: queryKeys.agents.list(),
+    queryKey: queryKeys.presets.list(),
     queryFn: async () => {
       const token = await getToken();
-      const { agents } = await api.agents.list(token);
+      const { agents } = await api.presets.list(token);
       return agents;
     },
   });
 }
 
-export function useCreateAgent() {
+export function useCreatePreset() {
   const getToken = useAuthToken();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: CreateAgentDefinitionDto) => {
       const token = await getToken();
-      const { agent } = await api.agents.create(data, token);
+      const { agent } = await api.presets.create(data, token);
       return agent;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agents.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.presets.all });
     },
   });
 }
 
-export function useUpdateAgent() {
+export function useUpdatePreset() {
   const getToken = useAuthToken();
   const queryClient = useQueryClient();
 
@@ -1320,27 +1320,27 @@ export function useUpdateAgent() {
       data: UpdateAgentDefinitionDto;
     }) => {
       const token = await getToken();
-      const { agent } = await api.agents.update(id, data, token);
+      const { agent } = await api.presets.update(id, data, token);
       return agent;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agents.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.presets.all });
     },
   });
 }
 
-export function useDeleteAgent() {
+export function useDeletePreset() {
   const getToken = useAuthToken();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
       const token = await getToken();
-      await api.agents.delete(id, token);
+      await api.presets.delete(id, token);
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agents.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.presets.all });
     },
   });
 }

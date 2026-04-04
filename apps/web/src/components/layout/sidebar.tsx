@@ -66,10 +66,10 @@ const workspaceNavItems = [
     tourId: "nav-sessions",
   },
   {
-    title: "Agents",
-    href: "/agents",
+    title: "Presets",
+    href: "/presets",
     icon: BotMessageSquare,
-    tourId: "nav-agents",
+    tourId: "nav-presets",
   },
 ];
 

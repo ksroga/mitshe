@@ -51,10 +51,10 @@ import {
   Terminal,
 } from "lucide-react";
 import {
-  useAgents,
-  useCreateAgent,
-  useUpdateAgent,
-  useDeleteAgent,
+  usePresets,
+  useCreatePreset,
+  useUpdatePreset,
+  useDeletePreset,
   useAICredentials,
   useProjects,
   useRepositories,
@@ -82,14 +82,14 @@ const emptyForm = {
   defaultRepositoryIds: [] as string[],
 };
 
-export default function AgentsPage() {
-  const { data: agents = [], isLoading } = useAgents();
+export default function PresetsPage() {
+  const { data: presetsList = [], isLoading } = usePresets();
   const { data: aiCredentials = [] } = useAICredentials();
   const { data: projects = [] } = useProjects();
   const { data: repositories = [] } = useRepositories();
-  const createAgent = useCreateAgent();
-  const updateAgent = useUpdateAgent();
-  const deleteAgent = useDeleteAgent();
+  const createPreset = useCreatePreset();
+  const updatePreset = useUpdatePreset();
+  const deletePreset = useDeletePreset();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -103,20 +103,20 @@ export default function AgentsPage() {
     setDialogOpen(true);
   };
 
-  const openEdit = (agent: AgentDefinition) => {
-    setEditingId(agent.id);
+  const openEdit = (preset: AgentDefinition) => {
+    setEditingId(preset.id);
     setForm({
-      name: agent.name,
-      description: agent.description || "",
-      aiCredentialId: agent.aiCredentialId || "",
-      startArguments: agent.startArguments || "",
-      instructions: agent.instructions || "",
-      maxSessionDurationMs: agent.maxSessionDurationMs
-        ? String(agent.maxSessionDurationMs / 3600000)
+      name: preset.name,
+      description: preset.description || "",
+      aiCredentialId: preset.aiCredentialId || "",
+      startArguments: preset.startArguments || "",
+      instructions: preset.instructions || "",
+      maxSessionDurationMs: preset.maxSessionDurationMs
+        ? String(preset.maxSessionDurationMs / 3600000)
         : "",
-      defaultProjectId: agent.defaultProjectId || "",
+      defaultProjectId: preset.defaultProjectId || "",
       defaultRepositoryIds:
-        agent.defaultRepositories?.map((r) => r.repositoryId) || [],
+        preset.defaultRepositories?.map((r) => r.repositoryId) || [],
     });
     setDialogOpen(true);
   };
@@ -145,26 +145,26 @@ export default function AgentsPage() {
 
     try {
       if (editingId) {
-        await updateAgent.mutateAsync({ id: editingId, data });
-        toast.success("Agent updated");
+        await updatePreset.mutateAsync({ id: editingId, data });
+        toast.success("Preset updated");
       } else {
-        await createAgent.mutateAsync(data);
-        toast.success("Agent created");
+        await createPreset.mutateAsync(data);
+        toast.success("Preset created");
       }
       setDialogOpen(false);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to save agent",
+        error instanceof Error ? error.message : "Failed to save preset",
       );
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteAgent.mutateAsync(id);
-      toast.success("Agent deleted");
+      await deletePreset.mutateAsync(id);
+      toast.success("Preset deleted");
     } catch {
-      toast.error("Failed to delete agent");
+      toast.error("Failed to delete preset");
     }
   };
 
@@ -181,25 +181,25 @@ export default function AgentsPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Agents</h1>
+          <h1 className="text-2xl font-bold">Presets</h1>
           <p className="text-muted-foreground">
-            Define reusable agent presets for your sessions
+            Define reusable presets for your sessions
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreate}>
               <Plus className="w-4 h-4 mr-2" />
-              New Agent
+              New Preset
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>
-                {editingId ? "Edit Agent" : "New Agent"}
+                {editingId ? "Edit Preset" : "New Preset"}
               </DialogTitle>
               <DialogDescription>
-                Define an agent preset that can be used when creating sessions
+                Define a preset that can be used when creating sessions
               </DialogDescription>
             </DialogHeader>
             <DialogBody className="space-y-4 py-4 overflow-y-auto">
@@ -221,7 +221,7 @@ export default function AgentsPage() {
                   onChange={(e) =>
                     setForm({ ...form, description: e.target.value })
                   }
-                  placeholder="What this agent does..."
+                  placeholder="What this preset does..."
                 />
               </div>
 
@@ -258,7 +258,7 @@ export default function AgentsPage() {
                   className="font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  CLI arguments passed to the agent on start
+                  CLI arguments passed to the agent CLI on start
                 </p>
               </div>
 
@@ -334,7 +334,7 @@ export default function AgentsPage() {
                   onChange={(e) =>
                     setForm({ ...form, instructions: e.target.value })
                   }
-                  placeholder="System instructions for the agent..."
+                  placeholder="System instructions for the preset..."
                   rows={4}
                 />
               </div>
@@ -349,12 +349,12 @@ export default function AgentsPage() {
               <Button
                 onClick={handleSave}
                 disabled={
-                  createAgent.isPending ||
-                  updateAgent.isPending ||
+                  createPreset.isPending ||
+                  updatePreset.isPending ||
                   !form.name.trim()
                 }
               >
-                {(createAgent.isPending || updateAgent.isPending) && (
+                {(createPreset.isPending || updatePreset.isPending) && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
                 {editingId ? "Save" : "Create"}
@@ -366,7 +366,7 @@ export default function AgentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Agents</CardTitle>
+          <CardTitle>All Presets</CardTitle>
           <CardDescription>
             Select an agent when creating a new session to pre-fill
             configuration
@@ -377,37 +377,37 @@ export default function AgentsPage() {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
-          ) : agents.length === 0 ? (
+          ) : presetsList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <BotMessageSquare className="w-12 h-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Agents</h3>
+              <h3 className="text-lg font-semibold mb-2">No Presets</h3>
               <p className="text-muted-foreground text-center mb-4">
-                Create your first agent preset
+                Create your first preset
               </p>
               <Button onClick={openCreate}>
                 <Plus className="w-4 h-4 mr-2" />
-                New Agent
+                New Preset
               </Button>
             </div>
           ) : (
             <div className="space-y-2">
-              {agents.map((agent) => (
+              {presetsList.map((preset) => (
                 <div
-                  key={agent.id}
+                  key={preset.id}
                   className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">
-                        {agent.name}
+                        {preset.name}
                       </span>
-                      {agent.aiCredential && (
+                      {preset.aiCredential && (
                         <Badge variant="outline" className="text-[10px]">
-                          {providerLabels[agent.aiCredential.provider] ||
-                            agent.aiCredential.provider}
+                          {providerLabels[preset.aiCredential.provider] ||
+                            preset.aiCredential.provider}
                         </Badge>
                       )}
-                      {agent.startArguments && (
+                      {preset.startArguments && (
                         <Badge
                           variant="secondary"
                           className="text-[10px] font-mono"
@@ -417,9 +417,9 @@ export default function AgentsPage() {
                         </Badge>
                       )}
                     </div>
-                    {agent.description && (
+                    {preset.description && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {agent.description}
+                        {preset.description}
                       </p>
                     )}
                   </div>
@@ -429,7 +429,7 @@ export default function AgentsPage() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => openEdit(agent)}
+                      onClick={() => openEdit(preset)}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
@@ -447,7 +447,7 @@ export default function AgentsPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Agent</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete &quot;{agent.name}
+                            Are you sure you want to delete &quot;{preset.name}
                             &quot;? Existing sessions using this agent will
                             not be affected.
                           </AlertDialogDescription>
@@ -455,7 +455,7 @@ export default function AgentsPage() {
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDelete(agent.id)}
+                            onClick={() => handleDelete(preset.id)}
                             className="bg-red-600 hover:bg-red-700"
                           >
                             Delete
