@@ -255,7 +255,70 @@ export default function SessionDetailPage() {
     [tabs],
   );
 
+  // ─── Keyboard Shortcuts ─────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Prevent browser defaults when focus is in session page
+      if (e.ctrlKey || e.metaKey) {
+        const key = e.key.toLowerCase();
+        // Block browser refresh/replace/find when inside session
+        if (["r", "g", "p"].includes(key)) {
+          // Only block if not in an input/textarea
+          const tag = (e.target as HTMLElement)?.tagName;
+          if (tag !== "INPUT" && tag !== "TEXTAREA") {
+            e.preventDefault();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // ─── File Operations ───────────────────────────────────────────
+
+  const handleNewFile = useCallback(
+    async (dirPath: string) => {
+      const name = prompt("New file name:");
+      if (!name?.trim()) return;
+      const filePath = dirPath === "." ? name : `${dirPath}/${name}`;
+      const fullPath = `/workspace/${filePath}`;
+      try {
+        await writeFile.mutateAsync({
+          id: sessionId,
+          path: fullPath,
+          content: "",
+        });
+        handleOpenFile(filePath);
+      } catch {
+        toast.error("Failed to create file");
+      }
+    },
+    [sessionId, writeFile, handleOpenFile],
+  );
+
+  const handleNewFolder = useCallback(
+    async (dirPath: string) => {
+      const name = prompt("New folder name:");
+      if (!name?.trim()) return;
+      const folderPath = dirPath === "." ? name : `${dirPath}/${name}`;
+      const fullPath = `/workspace/${folderPath}`;
+      try {
+        // Create folder by creating a .gitkeep inside it
+        await writeFile.mutateAsync({
+          id: sessionId,
+          path: `${fullPath}/.gitkeep`,
+          content: "",
+        });
+        toast.success(`Created folder: ${name}`);
+      } catch {
+        toast.error("Failed to create folder");
+      }
+    },
+    [sessionId, writeFile],
+  );
 
   const handleSaveFile = useCallback(
     (tabId: string, content: string) => {
@@ -460,6 +523,8 @@ export default function SessionDetailPage() {
           onFileClick={handleOpenFile}
           onDelete={handleDeleteFile}
           onRename={handleRenameFile}
+          onNewFile={handleNewFile}
+          onNewFolder={handleNewFolder}
           gitStatuses={gitStatuses}
         />
 

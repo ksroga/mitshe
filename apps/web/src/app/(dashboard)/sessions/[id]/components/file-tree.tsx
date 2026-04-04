@@ -111,9 +111,28 @@ function showFileContextMenu(
     items.push({ label: "Open", action: () => actions.onFileClick(path) });
   }
 
+  // For directories: create inside them. For files: create in parent dir.
+  const targetDir =
+    type === "directory" ? path : path.split("/").slice(0, -1).join("/") || ".";
+
+  if (actions.onNewFile) {
+    items.push({
+      label: "New File...",
+      action: () => actions.onNewFile!(targetDir),
+    });
+  }
+
+  if (actions.onNewFolder) {
+    items.push({
+      label: "New Folder...",
+      action: () => actions.onNewFolder!(targetDir),
+    });
+  }
+
   items.push({
     label: "Copy Path",
     action: () => navigator.clipboard.writeText(path),
+    separator: true,
   });
 
   items.push({
@@ -123,7 +142,7 @@ function showFileContextMenu(
 
   if (actions.onRename) {
     items.push({
-      label: "Rename",
+      label: "Rename...",
       action: () => actions.onRename!(path),
       separator: true,
     });
@@ -144,6 +163,8 @@ export interface FileTreeActions {
   onFileClick: (path: string) => void;
   onDelete?: (path: string) => void;
   onRename?: (path: string) => void;
+  onNewFile?: (dirPath: string) => void;
+  onNewFolder?: (dirPath: string) => void;
 }
 
 function FileTreeItem({
@@ -243,6 +264,8 @@ export function FileTree({
   onFileClick,
   onDelete,
   onRename,
+  onNewFile,
+  onNewFolder,
   gitStatuses,
 }: {
   files: string[];
@@ -251,6 +274,8 @@ export function FileTree({
   onFileClick: (path: string) => void;
   onDelete?: (path: string) => void;
   onRename?: (path: string) => void;
+  onNewFile?: (dirPath: string) => void;
+  onNewFolder?: (dirPath: string) => void;
   gitStatuses?: Array<{ path: string; status: string }>;
 }) {
   const fileTree = buildFileTree(files, basePath);
@@ -262,7 +287,13 @@ export function FileTree({
     }
   }
 
-  const actions: FileTreeActions = { onFileClick, onDelete, onRename };
+  const actions: FileTreeActions = {
+    onFileClick,
+    onDelete,
+    onRename,
+    onNewFile,
+    onNewFolder,
+  };
 
   return (
     <div className="w-60 border-r shrink-0 flex flex-col overflow-hidden min-h-0">
