@@ -9,6 +9,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { showContextMenu, type ContextMenuItem } from "./context-menu";
 
 export interface FileTreeNode {
   name: string;
@@ -98,25 +99,13 @@ function dirHasChanges(
   );
 }
 
-function showContextMenu(
+function showFileContextMenu(
   e: React.MouseEvent,
   path: string,
   type: "file" | "directory",
   actions: FileTreeActions,
 ) {
-  e.preventDefault();
-
-  const menu = document.createElement("div");
-  menu.className =
-    "fixed z-50 bg-popover border rounded-md shadow-md py-1 text-xs min-w-[180px]";
-  menu.style.left = `${e.clientX}px`;
-  menu.style.top = `${e.clientY}px`;
-
-  const items: Array<{
-    label: string;
-    action: () => void;
-    separator?: boolean;
-  }> = [];
+  const items: ContextMenuItem[] = [];
 
   if (type === "file") {
     items.push({ label: "Open", action: () => actions.onFileClick(path) });
@@ -137,32 +126,11 @@ function showContextMenu(
       label: "Delete",
       action: () => actions.onDelete!(path),
       separator: true,
+      destructive: true,
     });
   }
 
-  for (const item of items) {
-    if (item.separator) {
-      const sep = document.createElement("div");
-      sep.className = "border-t my-1";
-      menu.appendChild(sep);
-    }
-    const btn = document.createElement("button");
-    btn.className =
-      "w-full text-left px-3 py-1.5 hover:bg-muted text-popover-foreground";
-    btn.textContent = item.label;
-    btn.onclick = () => {
-      item.action();
-      menu.remove();
-    };
-    menu.appendChild(btn);
-  }
-
-  document.body.appendChild(menu);
-  const close = () => {
-    menu.remove();
-    document.removeEventListener("click", close);
-  };
-  setTimeout(() => document.addEventListener("click", close), 0);
+  showContextMenu(e, items);
 }
 
 export interface FileTreeActions {
@@ -190,7 +158,7 @@ function FileTreeItem({
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) =>
-      showContextMenu(e, node.path, node.type, actions),
+      showFileContextMenu(e, node.path, node.type, actions),
     [node.path, node.type, actions],
   );
 

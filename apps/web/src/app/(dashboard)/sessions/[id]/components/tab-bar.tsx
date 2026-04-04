@@ -2,6 +2,7 @@
 
 import { X, Terminal as TerminalIcon, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { showContextMenu } from "./context-menu";
 
 export interface Tab {
   id: string;
@@ -40,58 +41,54 @@ export function TabBar({
           )}
           onClick={() => onTabClick(tab.id)}
           onAuxClick={(e) => {
-            // Middle-click close
             if (e.button === 1 && tab.closeable) {
               e.preventDefault();
               onTabClose(tab.id);
             }
           }}
           onContextMenu={(e) => {
-            if (!tab.closeable) return;
-            e.preventDefault();
-            // Simple context menu via native approach
-            const menu = document.createElement("div");
-            menu.className =
-              "fixed z-50 bg-popover border rounded-md shadow-md py-1 text-xs min-w-[160px]";
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
+            const items = [];
 
-            const items = [
-              {
-                label: "Close",
-                action: () => onTabClose(tab.id),
-              },
-              ...(onCloseOthers
-                ? [
-                    {
-                      label: "Close Others",
-                      action: () => onCloseOthers(tab.id),
-                    },
-                  ]
-                : []),
-              ...(onCloseAll
-                ? [{ label: "Close All Files", action: () => onCloseAll() }]
-                : []),
-            ];
-
-            for (const item of items) {
-              const btn = document.createElement("button");
-              btn.className =
-                "w-full text-left px-3 py-1.5 hover:bg-muted text-popover-foreground";
-              btn.textContent = item.label;
-              btn.onclick = () => {
-                item.action();
-                menu.remove();
-              };
-              menu.appendChild(btn);
+            if (tab.filePath) {
+              items.push({
+                label: "Copy Path",
+                action: () =>
+                  navigator.clipboard.writeText(tab.filePath || ""),
+              });
+              items.push({
+                label: "Copy Full Path",
+                action: () =>
+                  navigator.clipboard.writeText(
+                    `/workspace/${tab.filePath}`,
+                  ),
+              });
             }
 
-            document.body.appendChild(menu);
-            const close = () => {
-              menu.remove();
-              document.removeEventListener("click", close);
-            };
-            setTimeout(() => document.addEventListener("click", close), 0);
+            if (tab.closeable) {
+              items.push({
+                label: "Close",
+                action: () => onTabClose(tab.id),
+                separator: items.length > 0,
+              });
+
+              if (onCloseOthers) {
+                items.push({
+                  label: "Close Others",
+                  action: () => onCloseOthers(tab.id),
+                });
+              }
+            }
+
+            if (onCloseAll) {
+              items.push({
+                label: "Close All Files",
+                action: () => onCloseAll(),
+              });
+            }
+
+            if (items.length > 0) {
+              showContextMenu(e, items);
+            }
           }}
         >
           {tab.type === "terminal" ? (
