@@ -11,3 +11,4 @@ export * from "./integration";
 export * from "./repository";
 export * from "./api-key";
 export * from "./ai-credential";
+export * from "./session";
