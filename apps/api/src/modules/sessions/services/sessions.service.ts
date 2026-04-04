@@ -25,6 +25,8 @@ export class SessionsService {
         name: dto.name,
         projectId: dto.projectId || null,
         aiCredentialId: dto.aiCredentialId || null,
+        agentDefinitionId: dto.agentDefinitionId || null,
+        startArguments: dto.startArguments || null,
         instructions: dto.instructions || '',
         createdBy: userId,
         repositories: {
@@ -35,6 +37,7 @@ export class SessionsService {
         repositories: { include: { repository: true } },
         project: { select: { id: true, name: true, key: true } },
         aiCredential: { select: { id: true, provider: true } },
+        agentDefinition: { select: { id: true, name: true } },
       },
     });
 
@@ -55,6 +58,7 @@ export class SessionsService {
         repositories: { include: { repository: true } },
         project: { select: { id: true, name: true, key: true } },
         aiCredential: { select: { id: true, provider: true } },
+        agentDefinition: { select: { id: true, name: true } },
         _count: { select: { messages: true } },
       },
       orderBy: { lastActiveAt: 'desc' },
@@ -69,6 +73,7 @@ export class SessionsService {
         messages: { orderBy: { createdAt: 'asc' } },
         project: { select: { id: true, name: true, key: true } },
         aiCredential: { select: { id: true, provider: true } },
+        agentDefinition: { select: { id: true, name: true } },
       },
     });
 

@@ -30,7 +30,17 @@ export class CreateSessionDto {
 
   @IsString()
   @IsOptional()
-  @ApiPropertyOptional({ description: 'System instructions (like CLAUDE.md)' })
+  @ApiPropertyOptional({ description: 'Agent definition ID (preset)' })
+  agentDefinitionId?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Start arguments for the agent CLI' })
+  startArguments?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'System instructions' })
   instructions?: string;
 }
 
