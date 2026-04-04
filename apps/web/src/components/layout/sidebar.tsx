@@ -58,7 +58,7 @@ const coreNavItems = [
   },
 ];
 
-const agentNavItems = [
+const workspaceNavItems = [
   {
     title: "Sessions",
     href: "/sessions",
@@ -164,12 +164,12 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
         ))}
       </div>
 
-      {/* Agent Sessions Section */}
+      {/* Workspace Section */}
       <div className="mt-6 space-y-1">
         <p className="px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Agents
+          Workspace
         </p>
-        {agentNavItems.map((item) => (
+        {workspaceNavItems.map((item) => (
           <Button
             key={item.href}
             variant={isActive(item.href) ? "secondary" : "ghost"}
