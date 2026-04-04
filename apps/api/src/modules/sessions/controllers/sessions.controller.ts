@@ -316,4 +316,30 @@ export class SessionsController {
     );
     return { files };
   }
+
+  @Get(':id/file')
+  @ApiOperation({ summary: 'Read file content from session container' })
+  async readFile(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Query('path') filePath: string,
+  ) {
+    const session = await this.sessionsService.findOne(organizationId, id);
+
+    if (!session.containerId) {
+      throw new BadRequestException('Session has no container');
+    }
+
+    if (
+      !(await this.containerService.isContainerRunning(session.containerId))
+    ) {
+      throw new BadRequestException('Container is not running');
+    }
+
+    const content = await this.containerService.readFile(
+      session.containerId,
+      filePath,
+    );
+    return { path: filePath, content };
+  }
 }

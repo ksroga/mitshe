@@ -225,6 +225,64 @@ export class SessionContainerService implements OnModuleInit {
   }
 
   /**
+   * Read a file from the container
+   */
+  async readFile(containerId: string, filePath: string): Promise<string> {
+    const container = this.docker.getContainer(containerId);
+
+    const exec = await container.exec({
+      Cmd: ['cat', filePath],
+      AttachStdout: true,
+      AttachStderr: true,
+      User: 'executor',
+      Tty: false,
+    });
+
+    return new Promise((resolve, reject) => {
+      exec.start({}, (err, stream) => {
+        if (err || !stream) {
+          reject(err || new Error('No stream'));
+          return;
+        }
+
+        let output = '';
+        let errorOutput = '';
+
+        stream.on('data', (chunk: Buffer) => {
+          // Non-TTY: demux multiplexed stream
+          let offset = 0;
+          while (offset < chunk.length) {
+            if (offset + 8 > chunk.length) {
+              output += chunk.slice(offset).toString('utf8');
+              break;
+            }
+            const type = chunk[offset];
+            const size = chunk.readUInt32BE(offset + 4);
+            if (offset + 8 + size > chunk.length) {
+              output += chunk.slice(offset).toString('utf8');
+              break;
+            }
+            const data = chunk.slice(offset + 8, offset + 8 + size).toString('utf8');
+            if (type === 1) output += data;
+            else if (type === 2) errorOutput += data;
+            offset += 8 + size;
+          }
+        });
+
+        stream.on('end', () => {
+          if (errorOutput && !output) {
+            reject(new Error(errorOutput.trim()));
+          } else {
+            resolve(output);
+          }
+        });
+
+        stream.on('error', reject);
+      });
+    });
+  }
+
+  /**
    * Check if there's an active interactive session
    */
   hasActiveSession(sessionId: string): boolean {

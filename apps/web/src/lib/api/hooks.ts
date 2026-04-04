@@ -1198,6 +1198,17 @@ export function useSessionFiles(id: string) {
       return files;
     },
     enabled: !!id,
-    refetchInterval: 10000, // Refresh every 10s
+    refetchInterval: 10000,
+  });
+}
+
+export function useReadSessionFile() {
+  const getToken = useAuthToken();
+
+  return useMutation({
+    mutationFn: async ({ id, path }: { id: string; path: string }) => {
+      const token = await getToken();
+      return api.sessions.readFile(id, path, token);
+    },
   });
 }

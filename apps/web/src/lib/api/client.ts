@@ -648,5 +648,11 @@ export const api = {
         token,
       });
     },
+
+    readFile: (id: string, filePath: string, token: string) =>
+      request<{ path: string; content: string }>(
+        `/sessions/${id}/file?path=${encodeURIComponent(filePath)}`,
+        { token },
+      ),
   },
 };
