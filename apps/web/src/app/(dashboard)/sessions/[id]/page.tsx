@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +101,45 @@ export default function SessionDetailPage() {
       socket.off("session:status", handleStatus);
     };
   }, [socket, sessionId, refetch]);
+
+  // Refresh open files when terminal has output (agent may have changed files)
+  const refreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (!socket || !sessionId) return;
+
+    const handleOutput = () => {
+      // Debounce: refresh files 2s after last terminal output
+      if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+      refreshDebounceRef.current = setTimeout(() => {
+        // Refresh all open file tabs
+        for (const tab of tabs) {
+          if (tab.type === "file" && tab.filePath) {
+            const fullPath = `/workspace/${tab.filePath}`;
+            readFile
+              .mutateAsync({ id: sessionId, path: fullPath })
+              .then((result) => {
+                setFileContents((prev) => {
+                  const current = prev[tab.id];
+                  // Only update if content actually changed
+                  if (current?.content === result.content) return prev;
+                  return {
+                    ...prev,
+                    [tab.id]: { content: result.content, loading: false },
+                  };
+                });
+              })
+              .catch(() => {});
+          }
+        }
+      }, 2000);
+    };
+
+    socket.on("session:output", handleOutput);
+    return () => {
+      socket.off("session:output", handleOutput);
+      if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+    };
+  }, [socket, sessionId, tabs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Tab Handlers ──────────────────────────────────────────────
 
