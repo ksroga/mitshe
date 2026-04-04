@@ -70,8 +70,14 @@ async function bootstrap() {
     .addTag('Environments', 'Container environment configurations')
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api', app, document);
+  // Swagger: enabled in dev, disabled in production unless ENABLE_SWAGGER=true
+  if (nodeEnv !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api', app, document);
+    logger.log('Swagger API docs available at /api');
+  } else {
+    logger.log('Swagger API docs disabled in production (set ENABLE_SWAGGER=true to enable)');
+  }
 
   const port = config.get('port', { infer: true }) || 3001;
   await app.listen(port);
