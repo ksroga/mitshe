@@ -125,6 +125,19 @@ export class SyncResultResponseDto {
   };
 }
 
+export class BulkDeleteRepositoriesDto {
+  @IsArray()
+  @IsString({ each: true })
+  ids: string[];
+}
+
+export class BulkDeleteResultResponseDto {
+  @ApiProperty({ description: 'Bulk delete result' })
+  result: {
+    deleted: number;
+  };
+}
+
 export class BulkUpdateResultResponseDto {
   @ApiProperty({ description: 'Bulk update result' })
   result: {

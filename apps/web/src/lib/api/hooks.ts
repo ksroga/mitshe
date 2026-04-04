@@ -944,6 +944,21 @@ export function useDeleteRepository() {
   });
 }
 
+export function useBulkDeleteRepositories() {
+  const getToken = useAuthToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const token = await getToken();
+      return api.repositories.bulkDelete(ids, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repositories.all });
+    },
+  });
+}
+
 export function useSyncRepositories() {
   const getToken = useAuthToken();
   const queryClient = useQueryClient();

@@ -23,10 +23,12 @@ import { OrganizationId } from '../../../shared/decorators/organization.decorato
 import {
   UpdateRepositoryDto,
   BulkUpdateRepositoriesDto,
+  BulkDeleteRepositoriesDto,
   RepositoryWrapperResponseDto,
   RepositoryListResponseDto,
   SyncResultResponseDto,
   BulkUpdateResultResponseDto,
+  BulkDeleteResultResponseDto,
 } from '../dto/repository.dto';
 import { ApiRateLimit } from '../../../shared/decorators/throttle.decorator';
 
@@ -115,6 +117,24 @@ export class RepositoriesController {
     const result = await this.repositoriesService.bulkUpdate(
       organizationId,
       dto,
+    );
+    return { result };
+  }
+
+  @Delete('bulk')
+  @ApiOperation({ summary: 'Bulk delete repositories' })
+  @ApiResponse({
+    status: 200,
+    description: 'Deleted repositories',
+    type: BulkDeleteResultResponseDto,
+  })
+  async bulkDelete(
+    @OrganizationId() organizationId: string,
+    @Body() dto: BulkDeleteRepositoriesDto,
+  ) {
+    const result = await this.repositoriesService.bulkDelete(
+      organizationId,
+      dto.ids,
     );
     return { result };
   }

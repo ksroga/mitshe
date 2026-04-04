@@ -126,6 +126,20 @@ export class RepositoriesService {
   }
 
   /**
+   * Bulk delete repositories
+   */
+  async bulkDelete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.repository.deleteMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+      },
+    });
+
+    return { deleted: result.count };
+  }
+
+  /**
    * Sync repositories from a git provider integration
    */
   async syncFromIntegration(organizationId: string, integrationId: string) {

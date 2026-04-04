@@ -512,6 +512,13 @@ export const api = {
         token,
       }),
 
+    bulkDelete: (ids: string[], token: string) =>
+      request<{ result: { deleted: number } }>("/repositories/bulk", {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+        token,
+      }),
+
     delete: (id: string, token: string) =>
       request<void>(`/repositories/${id}`, {
         method: "DELETE",

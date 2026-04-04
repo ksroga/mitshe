@@ -58,6 +58,7 @@ import {
   useUpdateRepository,
   useDeleteRepository,
   useBulkUpdateRepositories,
+  useBulkDeleteRepositories,
   useSyncRepositories,
   useIntegrations,
 } from "@/lib/api/hooks";
@@ -79,6 +80,7 @@ export default function RepositoriesPage() {
   const updateRepository = useUpdateRepository();
   const deleteRepository = useDeleteRepository();
   const bulkUpdate = useBulkUpdateRepositories();
+  const bulkDelete = useBulkDeleteRepositories();
   const syncRepositories = useSyncRepositories();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -151,6 +153,17 @@ export default function RepositoriesPage() {
       setSelectedIds([]);
     } catch {
       toast.error("Failed to disable repositories");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      const { result } = await bulkDelete.mutateAsync(selectedIds);
+      toast.success(`Deleted ${result.deleted} repositories`);
+      setSelectedIds([]);
+    } catch {
+      toast.error("Failed to delete repositories");
     }
   };
 
@@ -281,6 +294,38 @@ export default function RepositoriesPage() {
           >
             Disable
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkDelete.isPending}
+                className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Repositories</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete {selectedIds.length}{" "}
+                  {selectedIds.length === 1 ? "repository" : "repositories"}?
+                  You can re-sync them later from your Git provider.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkDelete}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
             Clear
           </Button>
