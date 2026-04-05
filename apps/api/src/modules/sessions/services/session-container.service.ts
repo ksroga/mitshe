@@ -63,6 +63,8 @@ export class SessionContainerService implements OnModuleInit {
       Cmd: [
         [
           'chown -R executor:executor /home/executor 2>/dev/null',
+          // Start Docker daemon in background if DinD volume is mounted (runs as root)
+          'if [ -d /var/lib/docker ]; then dockerd &>/var/log/dockerd.log & for i in $(seq 1 30); do docker info &>/dev/null && break || sleep 1; done; fi',
           // Decode setup script from base64 env var and execute as executor (avoids shell injection)
           config.environment?.setupScript
             ? 'echo "$SETUP_SCRIPT_B64" | base64 -d > /tmp/.setup.sh && chmod +x /tmp/.setup.sh && su -s /bin/bash executor -c "bash /tmp/.setup.sh" && rm -f /tmp/.setup.sh'
