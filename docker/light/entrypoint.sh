@@ -6,13 +6,17 @@ echo "Starting mitshe-light..."
 # Create data directory if not exists
 mkdir -p /build/data
 
-# Initialize SQLite database if not exists
-if [ ! -f /build/data/mitshe.db ]; then
-    echo "Initializing database..."
-    cd /build/apps/api
-    prisma db push --skip-generate
-    echo "Database initialized"
+cd /build/apps/api
+if echo "$DATABASE_URL" | grep -q "^postgresql"; then
+    echo "Running PostgreSQL migrations..."
+    prisma migrate deploy 2>/dev/null || prisma db push --skip-generate
+else
+    if [ ! -f /build/data/mitshe.db ]; then
+        echo "Initializing SQLite database..."
+        prisma db push --skip-generate
+    fi
 fi
+echo "Database ready"
 
 # Generate encryption key if not set
 if [ -z "$ENCRYPTION_KEY" ]; then
