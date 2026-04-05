@@ -37,6 +37,7 @@ WORKDIR /build/apps/web
 ENV NEXT_PUBLIC_AUTH_MODE=selfhosted
 ENV AUTH_MODE=selfhosted
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV TURBO_ROOT=/build
 RUN pnpm run build
 
 FROM node:20-alpine AS production
