@@ -170,6 +170,32 @@ export class SessionContainerService implements OnModuleInit {
     }
   }
 
+  /**
+   * Returns container state: 'running', 'stopped' (exists but not running), or 'gone'.
+   */
+  async getContainerState(
+    containerId: string,
+  ): Promise<'running' | 'stopped' | 'gone'> {
+    try {
+      const container = this.docker.getContainer(containerId);
+      const info = await container.inspect();
+      return info.State.Running ? 'running' : 'stopped';
+    } catch {
+      return 'gone';
+    }
+  }
+
+  /**
+   * Restart a stopped container (e.g. after host reboot / Exited 255).
+   */
+  async restartContainer(containerId: string): Promise<void> {
+    const container = this.docker.getContainer(containerId);
+    await container.start();
+    this.logger.log(
+      `Restarted stopped container: ${containerId.slice(0, 12)}`,
+    );
+  }
+
   // ─── File Operations ────────────────────────────────────────────
 
   async readFile(containerId: string, filePath: string): Promise<string> {

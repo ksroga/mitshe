@@ -283,11 +283,22 @@ export class SessionsController {
       );
     }
 
-    if (
-      !session.containerId ||
-      !(await this.containerService.isContainerRunning(session.containerId))
-    ) {
-      throw new BadRequestException('Container is no longer running');
+    if (!session.containerId) {
+      throw new BadRequestException('No container associated with this session');
+    }
+
+    const containerState = await this.containerService.getContainerState(
+      session.containerId,
+    );
+
+    if (containerState === 'gone') {
+      throw new BadRequestException(
+        'Container no longer exists and cannot be recovered',
+      );
+    }
+
+    if (containerState === 'stopped') {
+      await this.containerService.restartContainer(session.containerId);
     }
 
     await this.sessionsService.updateStatus(id, 'RUNNING');
