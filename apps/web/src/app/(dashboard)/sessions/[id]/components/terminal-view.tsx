@@ -17,7 +17,9 @@ export function TerminalView({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const xtermRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fitRef = useRef<any>(null);
   const { socket, subscribeToSession, unsubscribeFromSession } = useSocket();
   const startTerminal = useStartTerminal();
@@ -27,7 +29,9 @@ export function TerminalView({
   useEffect(() => {
     if (!termRef.current || !containerRef.current) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let terminal: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let fitAddon: any;
     let disposed = false;
 

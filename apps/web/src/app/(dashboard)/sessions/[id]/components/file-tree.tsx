@@ -48,6 +48,7 @@ export function buildFileTree(
   paths: string[],
   basePath: string,
 ): FileTreeNode[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const root: Record<string, any> = {};
 
   for (const filePath of paths) {
@@ -72,6 +73,7 @@ export function buildFileTree(
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function toArray(obj: Record<string, any>): FileTreeNode[] {
     return Object.values(obj)
       .map((n) => ({

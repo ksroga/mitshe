@@ -40,10 +40,12 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
-          else
+          elif [[ "${{ github.event.inputs.version }}" != "" ]]; then
             VERSION=${{ github.event.inputs.version }}
+          else
+            VERSION=latest
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -56,7 +58,8 @@ jobs:
           provenance: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and push Executor
         uses: docker/build-push-action@v6
@@ -67,7 +70,8 @@ jobs:
           provenance: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-executor:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-executor:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Summary
         run: |

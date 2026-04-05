@@ -68,7 +68,7 @@ import {
 import { useSocket } from "@/lib/socket/socket-context";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/api/hooks";
-import type { SessionStatus, AgentDefinition } from "@/lib/api/types";
+import type { SessionStatus } from "@/lib/api/types";
 
 const providerLabels: Record<string, string> = {
   CLAUDE: "Claude",

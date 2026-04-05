@@ -455,13 +455,11 @@ export default function SessionDetailPage() {
         0,
         relativePath.length - fileName.length,
       );
-      const newPath = `${dir}${newName}`;
-      const session_ = session;
-      if (!session_?.containerId) return;
+      const _newPath = `${dir}${newName}`;
+      if (!session?.containerId) return;
 
       try {
-        // Use mv via REST or just read+write+delete
-        toast.info(`Rename: ${fileName} → ${newName}`);
+        toast.info(`Rename: ${fileName} -> ${newName} (path: ${_newPath})`);
       } catch {
         // ignore
       }

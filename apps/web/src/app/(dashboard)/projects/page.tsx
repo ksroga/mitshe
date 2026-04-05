@@ -47,7 +47,6 @@ import {
   ListTodo,
   Workflow,
   MessageSquareCode,
-  BotMessageSquare,
   Settings,
   Loader2,
 } from "lucide-react";

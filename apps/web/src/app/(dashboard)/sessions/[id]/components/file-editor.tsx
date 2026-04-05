@@ -75,12 +75,14 @@ export function FileEditor({
   onSave: (content: string) => void;
   onContentRefresh?: () => void;
 }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [MonacoEditor, setMonacoEditor] = useState<any>(null);
   const [localContent, setLocalContent] = useState<string | null>(content);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
 
   useEffect(() => {
@@ -135,6 +137,7 @@ export function FileEditor({
 
   // Ctrl+S manual save
   const handleEditorMount = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (editor: any) => {
       editorRef.current = editor;
       editor.addCommand(

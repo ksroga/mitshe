@@ -41,7 +41,6 @@ import type {
   UpdateEnvironmentDto,
   AgentSession,
   CreateSessionDto,
-  SessionFileNode,
   WorkflowTemplateMetadata,
   WorkflowTemplate,
   CreateFromTemplateDto,
