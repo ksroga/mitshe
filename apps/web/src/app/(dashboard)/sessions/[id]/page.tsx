@@ -60,7 +60,7 @@ export default function SessionDetailPage() {
   const sessionId = params.id as string;
 
   const { data: session, isLoading, refetch } = useSession(sessionId);
-  const { data: files = [] } = useSessionFiles(sessionId);
+  const { data: files = [], isLoading: filesLoading } = useSessionFiles(sessionId);
   const { data: gitStatuses = [] } = useSessionGitStatus(sessionId);
   const pauseSession = usePauseSession();
   const resumeSession = useResumeSession();
@@ -625,7 +625,7 @@ export default function SessionDetailPage() {
         <FileTree
           files={files}
           basePath="/workspace"
-          isLoading={isActive && files.length === 0}
+          isLoading={filesLoading}
           onFileClick={handleOpenFile}
           onDelete={handleDeleteFile}
           onRename={handleRenameFile}
