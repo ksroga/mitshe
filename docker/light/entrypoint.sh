@@ -6,6 +6,16 @@ echo "Starting mitshe-light..."
 # Create data directory if not exists
 mkdir -p /build/data
 
+# Fix Docker socket permissions (GID may differ between host and container)
+if [ -S /var/run/docker.sock ]; then
+    SOCK_GID=$(stat -c '%g' /var/run/docker.sock)
+    if ! getent group "$SOCK_GID" > /dev/null 2>&1; then
+        addgroup -g "$SOCK_GID" dockerhost 2>/dev/null || true
+    fi
+    DOCKER_GROUP=$(getent group "$SOCK_GID" | cut -d: -f1)
+    adduser mitshe "$DOCKER_GROUP" 2>/dev/null || true
+fi
+
 # Initialize SQLite database if not exists
 if [ ! -f /build/data/mitshe.db ]; then
     echo "Initializing database..."
@@ -13,6 +23,9 @@ if [ ! -f /build/data/mitshe.db ]; then
     prisma db push --skip-generate
     echo "Database initialized"
 fi
+
+# Fix data directory ownership (entrypoint runs as root, app runs as mitshe)
+chown -R mitshe:mitshe /build/data
 
 # Generate encryption key if not set
 if [ -z "$ENCRYPTION_KEY" ]; then

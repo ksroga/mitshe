@@ -1,8 +1,8 @@
 # Mitshe Workflow Executor
 # Base image for isolated workflow execution environments
-# Contains: Node.js 20, Git, Claude Code, Python, common dev tools
+# Contains: Node.js 22, Git, Claude Code, OpenClaw, Python, common dev tools
 
-FROM node:20-bookworm
+FROM node:22-bookworm
 
 LABEL maintainer="mitshe"
 LABEL description="Isolated execution environment for mitshe workflows"

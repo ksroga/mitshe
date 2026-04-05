@@ -95,7 +95,7 @@ export class SessionContainerService implements OnModuleInit {
         Memory: (config.environment?.memoryMb || 4096) * 1024 * 1024,
         NanoCpus: (config.environment?.cpuCores || 2) * 1e9,
         PidsLimit: 512,
-        NetworkMode: 'bridge',
+        NetworkMode: process.env.DOCKER_NETWORK || 'bridge',
         SecurityOpt: ['no-new-privileges:true'],
         CapDrop: ['ALL'],
         CapAdd: ['CHOWN', 'SETUID', 'SETGID', 'DAC_OVERRIDE'],
