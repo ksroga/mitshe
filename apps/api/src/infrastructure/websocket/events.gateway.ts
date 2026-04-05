@@ -9,7 +9,7 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, Injectable, Inject, Optional } from '@nestjs/common';
+import { Logger, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verifyToken } from '@clerk/backend';
 import * as jwt from 'jsonwebtoken';
@@ -202,7 +202,7 @@ export class EventsGateway
     if (!verifiedOrgId) {
       const membership = await this.prisma.organizationMember.findFirst({
         where: {
-          userId: clientData.userId!,
+          userId: clientData.userId,
           organizationId: requestedOrgId,
         },
         select: { id: true },
@@ -210,7 +210,7 @@ export class EventsGateway
       if (!membership) {
         // Also check if user is org owner
         const org = await this.prisma.organization.findFirst({
-          where: { id: requestedOrgId, ownerId: clientData.userId! },
+          where: { id: requestedOrgId, ownerId: clientData.userId },
           select: { id: true },
         });
         if (!org) {
@@ -676,9 +676,7 @@ export class EventsGateway
 
     void client.join(`session:${sessionId}`);
     clientData.rooms.add(`session:${sessionId}`);
-    this.logger.log(
-      `Client ${client.id} subscribed to session:${sessionId}`,
-    );
+    this.logger.log(`Client ${client.id} subscribed to session:${sessionId}`);
     return { event: 'subscribed', data: { sessionId } };
   }
 

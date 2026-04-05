@@ -76,7 +76,9 @@ async function bootstrap() {
     SwaggerModule.setup('api', app, document);
     logger.log('Swagger API docs available at /api');
   } else {
-    logger.log('Swagger API docs disabled in production (set ENABLE_SWAGGER=true to enable)');
+    logger.log(
+      'Swagger API docs disabled in production (set ENABLE_SWAGGER=true to enable)',
+    );
   }
 
   const port = config.get('port', { infer: true }) || 3001;

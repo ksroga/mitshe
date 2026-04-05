@@ -49,7 +49,9 @@ export class CreateEnvironmentDto {
 
   @IsString()
   @IsOptional()
-  @ApiPropertyOptional({ description: 'Setup script to run on container start' })
+  @ApiPropertyOptional({
+    description: 'Setup script to run on container start',
+  })
   setupScript?: string;
 
   @IsArray()

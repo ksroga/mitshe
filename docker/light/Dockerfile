@@ -123,7 +123,7 @@ WORKDIR /build
 
 # Create non-root user with docker group access
 RUN addgroup -g 998 docker 2>/dev/null || true && \
-    adduser -D -u 1000 mitshe && \
+    adduser -D -u 1001 mitshe && \
     addgroup mitshe docker 2>/dev/null || true && \
     chown -R mitshe:mitshe /build /var/log/supervisor
 

@@ -80,9 +80,8 @@ export class SessionContainerService implements OnModuleInit {
             ]
           : []),
         // Custom env vars from environment config
-        ...(config.environment?.variables?.map(
-          (v) => `${v.key}=${v.value}`,
-        ) || []),
+        ...(config.environment?.variables?.map((v) => `${v.key}=${v.value}`) ||
+          []),
       ],
       WorkingDir: '/workspace',
       Labels: {
@@ -93,8 +92,7 @@ export class SessionContainerService implements OnModuleInit {
       },
       HostConfig: {
         Binds: [`mitshe-executor-home-${config.organizationId}:/home/executor`],
-        Memory:
-          (config.environment?.memoryMb || 4096) * 1024 * 1024,
+        Memory: (config.environment?.memoryMb || 4096) * 1024 * 1024,
         NanoCpus: (config.environment?.cpuCores || 2) * 1e9,
         PidsLimit: 512,
         NetworkMode: 'bridge',
@@ -119,10 +117,8 @@ export class SessionContainerService implements OnModuleInit {
       const container = this.docker.getContainer(containerId);
       await container.stop({ t: 5 });
     } catch (err) {
-      if (!(err as any).statusCode || (err as any).statusCode !== 304) {
-        this.logger.warn(
-          `Failed to stop container: ${(err as Error).message}`,
-        );
+      if (!err.statusCode || err.statusCode !== 304) {
+        this.logger.warn(`Failed to stop container: ${(err as Error).message}`);
       }
     }
   }
@@ -132,9 +128,7 @@ export class SessionContainerService implements OnModuleInit {
       const container = this.docker.getContainer(containerId);
       await container.remove({ force: true });
     } catch (err) {
-      this.logger.warn(
-        `Failed to remove container: ${(err as Error).message}`,
-      );
+      this.logger.warn(`Failed to remove container: ${(err as Error).message}`);
     }
   }
 
@@ -171,19 +165,16 @@ export class SessionContainerService implements OnModuleInit {
     });
 
     await new Promise<void>((resolve, reject) => {
-      exec.start(
-        { hijack: true, stdin: true },
-        (err, stream) => {
-          if (err || !stream) {
-            reject(err || new Error('No stream'));
-            return;
-          }
-          stream.write(content);
-          stream.end();
-          stream.on('end', () => resolve());
-          stream.on('error', reject);
-        },
-      );
+      exec.start({ hijack: true, stdin: true }, (err, stream) => {
+        if (err || !stream) {
+          reject(err instanceof Error ? err : new Error('No stream'));
+          return;
+        }
+        stream.write(content);
+        stream.end();
+        stream.on('end', () => resolve());
+        stream.on('error', reject);
+      });
     });
   }
 
@@ -333,9 +324,7 @@ export class SessionContainerService implements OnModuleInit {
         }
       }
     } catch (err) {
-      this.logger.warn(
-        `Failed to cleanup: ${(err as Error).message}`,
-      );
+      this.logger.warn(`Failed to cleanup: ${(err as Error).message}`);
     }
   }
 }

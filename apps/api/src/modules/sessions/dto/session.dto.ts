@@ -87,7 +87,9 @@ export class ExecCommandDto {
   @IsInt()
   @Min(1000)
   @IsOptional()
-  @ApiPropertyOptional({ description: 'Timeout in milliseconds (default: 60000)' })
+  @ApiPropertyOptional({
+    description: 'Timeout in milliseconds (default: 60000)',
+  })
   timeout?: number;
 }
 

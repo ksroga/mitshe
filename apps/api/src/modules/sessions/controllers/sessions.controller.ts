@@ -71,9 +71,7 @@ export class SessionsController {
       : path.resolve(WORKSPACE, filePath);
 
     if (!resolved.startsWith(WORKSPACE + '/') && resolved !== WORKSPACE) {
-      throw new BadRequestException(
-        'Path must be within /workspace',
-      );
+      throw new BadRequestException('Path must be within /workspace');
     }
 
     return resolved;
@@ -119,10 +117,9 @@ export class SessionsController {
           const config = this.encryption.decryptJson(
             Buffer.from(integration.config),
             Buffer.from(integration.configIv),
-          ) as Record<string, string>;
+          );
 
-          const token =
-            config.accessToken || config.apiToken || config.token;
+          const token = config.accessToken || config.apiToken || config.token;
 
           if (token && cloneUrl.startsWith('https://')) {
             // Inject token into clone URL
@@ -167,6 +164,7 @@ export class SessionsController {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     setImmediate(async () => {
       try {
         const containerId = await this.containerService.createAndStart({
@@ -319,7 +317,9 @@ export class SessionsController {
 
   @Post(':id/exec')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Execute command in session container (non-interactive)' })
+  @ApiOperation({
+    summary: 'Execute command in session container (non-interactive)',
+  })
   async exec(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
@@ -368,8 +368,7 @@ export class SessionsController {
       throw new BadRequestException('Session has no container');
     }
 
-    const terminalId =
-      body?.terminalId || `${id}:term-${Date.now()}`;
+    const terminalId = body?.terminalId || `${id}:term-${Date.now()}`;
     const cmd = body?.cmd || ['bash'];
 
     // Already active — return buffer for reconnect

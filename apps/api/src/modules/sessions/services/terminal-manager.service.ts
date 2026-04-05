@@ -61,16 +61,13 @@ export class TerminalManagerService {
     });
 
     const stream: Duplex = await new Promise((resolve, reject) => {
-      exec.start(
-        { hijack: true, stdin: true, Tty: true },
-        (err, s) => {
-          if (err || !s) {
-            reject(err || new Error('No stream returned'));
-            return;
-          }
-          resolve(s);
-        },
-      );
+      exec.start({ hijack: true, stdin: true, Tty: true }, (err, s) => {
+        if (err || !s) {
+          reject(err instanceof Error ? err : new Error('No stream returned'));
+          return;
+        }
+        resolve(s);
+      });
     });
 
     this.terminals.set(terminalId, { exec, stream, containerId });

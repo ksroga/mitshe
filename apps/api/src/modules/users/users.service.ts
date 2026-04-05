@@ -59,7 +59,9 @@ export class UsersService {
   ) {
     const secret = this.configService.get<string>('JWT_SECRET');
     if (!secret) {
-      throw new Error('JWT_SECRET is required. Generate with: openssl rand -hex 32');
+      throw new Error(
+        'JWT_SECRET is required. Generate with: openssl rand -hex 32',
+      );
     }
     this.jwtSecret = secret;
     this.accessTokenExpiry =

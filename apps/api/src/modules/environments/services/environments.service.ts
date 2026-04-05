@@ -62,11 +62,7 @@ export class EnvironmentsService {
     return env;
   }
 
-  async update(
-    organizationId: string,
-    id: string,
-    dto: UpdateEnvironmentDto,
-  ) {
+  async update(organizationId: string, id: string, dto: UpdateEnvironmentDto) {
     await this.findOne(organizationId, id);
 
     // Replace variables if provided
