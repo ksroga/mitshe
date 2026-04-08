@@ -54,11 +54,14 @@ import {
   Clock,
   Trash2,
   Copy,
+  Pencil,
 } from "lucide-react";
 import { formatDistanceToNow } from "@/lib/utils";
 import {
   useSessions,
   useCreateSession,
+  useUpdateSession,
+  useRecreateSession,
   useDeleteSession,
   usePauseSession,
   useStopSession,
@@ -73,7 +76,7 @@ import {
 import { useSocket } from "@/lib/socket/socket-context";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/api/hooks";
-import type { SessionStatus } from "@/lib/api/types";
+import type { AgentSession, SessionStatus } from "@/lib/api/types";
 
 const providerLabels: Record<string, string> = {
   CLAUDE: "Claude",
@@ -142,6 +145,8 @@ export default function SessionsPage() {
     (i) => i.type === "GITHUB",
   )?.id;
   const createSession = useCreateSession();
+  const updateSession = useUpdateSession();
+  const recreateSession = useRecreateSession();
   const deleteSession = useDeleteSession();
   const pauseSession = usePauseSession();
   const stopSession = useStopSession();
@@ -157,8 +162,7 @@ export default function SessionsPage() {
     return () => { socket.off("session:status", handler); };
   }, [socket, queryClient]);
 
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [form, setForm] = useState({
+  const emptyForm = {
     agentDefinitionId: "",
     name: "",
     projectId: "",
@@ -169,7 +173,25 @@ export default function SessionsPage() {
     environmentId: "",
     enableDocker: false,
     instructions: "",
-  });
+  };
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingStatus, setEditingStatus] = useState<SessionStatus | null>(
+    null,
+  );
+  const [originalForm, setOriginalForm] = useState<typeof emptyForm | null>(
+    null,
+  );
+  const [form, setForm] = useState(emptyForm);
+
+  // Config fields cannot be edited while the container is running — would
+  // require destroying the running container mid-work. Metadata (name,
+  // project, instructions) is always editable.
+  const configLocked =
+    editingId !== null &&
+    editingStatus !== "COMPLETED" &&
+    editingStatus !== "FAILED";
 
   // Set default GitHub integration once data loads
   useEffect(() => {
@@ -182,6 +204,39 @@ export default function SessionsPage() {
       }));
     }
   }, [defaultGithubId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openCreate = () => {
+    setEditingId(null);
+    setEditingStatus(null);
+    setOriginalForm(null);
+    setForm({
+      ...emptyForm,
+      integrationIds: defaultGithubId ? [defaultGithubId] : [],
+    });
+    setIsDialogOpen(true);
+  };
+
+  const openEdit = (session: AgentSession) => {
+    const initial = {
+      agentDefinitionId: session.agentDefinitionId || "",
+      name: session.name,
+      projectId: session.projectId || "",
+      repositoryIds:
+        session.repositories?.map((r) => r.repositoryId) || [],
+      integrationIds:
+        session.integrations?.map((i) => i.integrationId) || [],
+      aiCredentialId: session.aiCredentialId || "",
+      startArguments: session.startArguments || "",
+      environmentId: session.environmentId || "",
+      enableDocker: session.enableDocker,
+      instructions: session.instructions || "",
+    };
+    setEditingId(session.id);
+    setEditingStatus(session.status);
+    setOriginalForm(initial);
+    setForm(initial);
+    setIsDialogOpen(true);
+  };
 
   const handleAgentSelect = (agentId: string) => {
     const agent = presetsList.find((a) => a.id === agentId);
@@ -211,46 +266,143 @@ export default function SessionsPage() {
     }));
   };
 
-  const handleCreate = async () => {
+  const setEqual = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const sa = new Set(a);
+    return b.every((x) => sa.has(x));
+  };
+
+  const metadataFields = ["name", "projectId", "instructions"] as const;
+  const configFields = [
+    "agentDefinitionId",
+    "aiCredentialId",
+    "startArguments",
+    "environmentId",
+    "enableDocker",
+  ] as const;
+
+  const computeChanges = () => {
+    if (!originalForm) return { metadataChanged: false, configChanged: false };
+    const metadataChanged = metadataFields.some(
+      (f) => form[f] !== originalForm[f],
+    );
+    const scalarConfigChanged = configFields.some(
+      (f) => form[f] !== originalForm[f],
+    );
+    const configChanged =
+      scalarConfigChanged ||
+      !setEqual(form.repositoryIds, originalForm.repositoryIds) ||
+      !setEqual(form.integrationIds, originalForm.integrationIds);
+    return { metadataChanged, configChanged };
+  };
+
+  const { metadataChanged, configChanged } = computeChanges();
+  const submitDisabled =
+    !form.name.trim() ||
+    createSession.isPending ||
+    updateSession.isPending ||
+    recreateSession.isPending ||
+    (editingId !== null && !metadataChanged && !configChanged) ||
+    (configChanged && configLocked);
+  const submitLabel = editingId
+    ? configChanged
+      ? "Save & Restart"
+      : "Save"
+    : "Start Session";
+
+  const handleSubmit = async () => {
     if (!form.name.trim()) {
       toast.error("Please enter a session name");
       return;
     }
-    // Repositories not strictly required — session can work without them
+
+    // Create flow
+    if (!editingId) {
+      try {
+        const session = await createSession.mutateAsync({
+          name: form.name,
+          projectId: form.projectId || undefined,
+          repositoryIds: form.repositoryIds,
+          integrationIds:
+            form.integrationIds.length > 0 ? form.integrationIds : undefined,
+          aiCredentialId: form.aiCredentialId || undefined,
+          agentDefinitionId: form.agentDefinitionId || undefined,
+          startArguments: form.startArguments || undefined,
+          environmentId: form.environmentId || undefined,
+          enableDocker: form.enableDocker || undefined,
+          instructions: form.instructions || undefined,
+        });
+        toast.success("Session created");
+        setIsDialogOpen(false);
+        setForm({
+          ...emptyForm,
+          integrationIds: defaultGithubId ? [defaultGithubId] : [],
+        });
+        router.push(`/sessions/${session.id}`);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to create session";
+        toast.error(message);
+      }
+      return;
+    }
+
+    // Edit flow
+    if (!metadataChanged && !configChanged) {
+      toast.info("No changes to save");
+      return;
+    }
+
+    if (configChanged && configLocked) {
+      toast.error(
+        "Stop the session first to reconfigure container settings",
+      );
+      return;
+    }
 
     try {
-      const session = await createSession.mutateAsync({
-        name: form.name,
-        projectId: form.projectId || undefined,
-        repositoryIds: form.repositoryIds,
-        integrationIds: form.integrationIds.length > 0 ? form.integrationIds : undefined,
-        aiCredentialId: form.aiCredentialId || undefined,
-        agentDefinitionId: form.agentDefinitionId || undefined,
-        startArguments: form.startArguments || undefined,
-        environmentId: form.environmentId || undefined,
-        enableDocker: form.enableDocker || undefined,
-        instructions: form.instructions || undefined,
-      });
-      toast.success("Session created");
-      setIsCreateOpen(false);
-      setForm({
-        agentDefinitionId: "",
-        name: "",
-        projectId: "",
-        repositoryIds: [],
-        integrationIds: defaultGithubId ? [defaultGithubId] : [],
-        aiCredentialId: "",
-        startArguments: "",
-        environmentId: "",
-        enableDocker: false,
-        instructions: "",
-      });
-      router.push(`/sessions/${session.id}`);
+      if (configChanged) {
+        await recreateSession.mutateAsync({
+          id: editingId,
+          data: {
+            name: form.name,
+            projectId: form.projectId,
+            repositoryIds: form.repositoryIds,
+            integrationIds: form.integrationIds,
+            aiCredentialId: form.aiCredentialId,
+            agentDefinitionId: form.agentDefinitionId,
+            startArguments: form.startArguments,
+            environmentId: form.environmentId,
+            enableDocker: form.enableDocker,
+            instructions: form.instructions,
+          },
+        });
+        toast.success("Session reconfigured — restarting container");
+      } else {
+        await updateSession.mutateAsync({
+          id: editingId,
+          data: {
+            name: form.name,
+            projectId: form.projectId,
+            instructions: form.instructions,
+          },
+        });
+        toast.success("Session updated");
+      }
+      setIsDialogOpen(false);
+      setEditingId(null);
+      setEditingStatus(null);
+      setOriginalForm(null);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to create session";
+        error instanceof Error ? error.message : "Failed to save session";
       toast.error(message);
     }
+  };
+
+  const handleEdit = (e: React.MouseEvent, session: AgentSession) => {
+    e.stopPropagation();
+    openEdit(session);
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -305,18 +457,34 @@ export default function SessionsPage() {
             Interactive AI agent sessions with isolated environments
           </p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setEditingId(null);
+              setEditingStatus(null);
+              setOriginalForm(null);
+            }
+          }}
+        >
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={openCreate}>
               <Plus className="w-4 h-4 mr-2" />
               New Session
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>New Session</DialogTitle>
+              <DialogTitle>
+                {editingId ? "Edit Session" : "New Session"}
+              </DialogTitle>
               <DialogDescription>
-                Start an interactive session in an isolated environment
+                {editingId
+                  ? configLocked
+                    ? "Stop the session first to reconfigure container settings. Metadata can always be edited."
+                    : "Changes to configuration will restart the container. Workspace files are preserved."
+                  : "Start an interactive session in an isolated environment"}
               </DialogDescription>
             </DialogHeader>
             <DialogBody className="space-y-4 py-4 overflow-y-auto">
@@ -325,6 +493,7 @@ export default function SessionsPage() {
                 <Select
                   value={form.agentDefinitionId}
                   onValueChange={handleAgentSelect}
+                  disabled={configLocked}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="No preset - configure manually" />
@@ -393,11 +562,16 @@ export default function SessionsPage() {
                     activeRepos.map((repo) => (
                       <label
                         key={repo.id}
-                        className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                        className={`flex items-center gap-2 p-1.5 rounded ${
+                          configLocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "hover:bg-muted/50 cursor-pointer"
+                        }`}
                       >
                         <Checkbox
                           checked={form.repositoryIds.includes(repo.id)}
                           onCheckedChange={() => toggleRepo(repo.id)}
+                          disabled={configLocked}
                         />
                         <span className="text-sm truncate">
                           {repo.fullPath}
@@ -429,7 +603,11 @@ export default function SessionsPage() {
                     activeIntegrations.map((integration) => (
                       <label
                         key={integration.id}
-                        className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                        className={`flex items-center gap-2 p-1.5 rounded ${
+                          configLocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "hover:bg-muted/50 cursor-pointer"
+                        }`}
                       >
                         <Checkbox
                           checked={form.integrationIds.includes(
@@ -446,6 +624,7 @@ export default function SessionsPage() {
                                   : [...prev.integrationIds, integration.id],
                             }))
                           }
+                          disabled={configLocked}
                         />
                         <span className="text-sm">{integration.type}</span>
                       </label>
@@ -461,6 +640,7 @@ export default function SessionsPage() {
                   onValueChange={(v) =>
                     setForm({ ...form, aiCredentialId: v })
                   }
+                  disabled={configLocked}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="None - plain bash terminal" />
@@ -485,6 +665,7 @@ export default function SessionsPage() {
                   }
                   placeholder="e.g., --dangerously-skip-permissions --model opus"
                   className="font-mono text-sm"
+                  disabled={configLocked}
                 />
               </div>
 
@@ -504,6 +685,7 @@ export default function SessionsPage() {
                     })
                   }
                   }
+                  disabled={configLocked}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Default environment" />
@@ -530,8 +712,14 @@ export default function SessionsPage() {
                   onCheckedChange={(checked) =>
                     setForm({ ...form, enableDocker: checked === true })
                   }
+                  disabled={configLocked}
                 />
-                <Label htmlFor="enableDocker" className="font-normal cursor-pointer text-sm">
+                <Label
+                  htmlFor="enableDocker"
+                  className={`font-normal text-sm ${
+                    configLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                  }`}
+                >
                   Enable Docker
                 </Label>
               </div>
@@ -554,18 +742,17 @@ export default function SessionsPage() {
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={() => setIsDialogOpen(false)}
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={createSession.isPending || !form.name.trim()}
-              >
-                {createSession.isPending && (
+              <Button onClick={handleSubmit} disabled={submitDisabled}>
+                {(createSession.isPending ||
+                  updateSession.isPending ||
+                  recreateSession.isPending) && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
-                Start Session
+                {submitLabel}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -591,7 +778,7 @@ export default function SessionsPage() {
               <p className="text-muted-foreground text-center mb-4">
                 Start your first interactive AI agent session
               </p>
-              <Button onClick={() => setIsCreateOpen(true)}>
+              <Button onClick={openCreate}>
                 <Plus className="w-4 h-4 mr-2" />
                 New Session
               </Button>
@@ -679,6 +866,22 @@ export default function SessionsPage() {
                         >
                           <Play className="w-3.5 h-3.5 mr-1" />
                           Open
+                        </Button>
+                      )}
+                      {session.status !== "CREATING" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => handleEdit(e, session)}
+                          title={
+                            session.status === "COMPLETED" ||
+                            session.status === "FAILED"
+                              ? "Edit"
+                              : "Edit metadata (stop to reconfigure)"
+                          }
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
                         </Button>
                       )}
                       {session.containerId && (
