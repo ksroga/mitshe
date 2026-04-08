@@ -12,6 +12,7 @@ export interface AgentSession {
   organizationId: string;
   projectId: string | null;
   agentDefinitionId: string | null;
+  environmentId: string | null;
   name: string;
   instructions: string;
   startArguments: string | null;
@@ -67,6 +68,25 @@ export interface CreateSessionDto {
   name: string;
   projectId?: string;
   repositoryIds: string[];
+  integrationIds?: string[];
+  aiCredentialId?: string;
+  agentDefinitionId?: string;
+  startArguments?: string;
+  environmentId?: string;
+  enableDocker?: boolean;
+  instructions?: string;
+}
+
+export interface UpdateSessionMetadataDto {
+  name?: string;
+  projectId?: string;
+  instructions?: string;
+}
+
+export interface RecreateSessionDto {
+  name?: string;
+  projectId?: string;
+  repositoryIds?: string[];
   integrationIds?: string[];
   aiCredentialId?: string;
   agentDefinitionId?: string;
