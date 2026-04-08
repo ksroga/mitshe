@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Put,
   Delete,
   Body,
   Param,
@@ -34,6 +36,8 @@ import { EventsGateway } from '../../../infrastructure/websocket/events.gateway'
 import {
   CreateSessionDto,
   ExecCommandDto,
+  RecreateSessionDto,
+  UpdateSessionMetadataDto,
   WriteFileDto,
   StartTerminalDto,
   TerminalInputDto,
@@ -284,6 +288,216 @@ export class SessionsController {
     @Param('id') id: string,
   ) {
     const session = await this.sessionsService.findOne(organizationId, id);
+    return { session };
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Update session metadata (name, projectId, instructions)',
+  })
+  @ApiResponse({ status: 200, type: SessionDetailResponseDto })
+  async updateMetadata(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateSessionMetadataDto,
+  ) {
+    const session = await this.sessionsService.updateMetadata(
+      organizationId,
+      id,
+      dto,
+    );
+    return { session };
+  }
+
+  @Put(':id')
+  @ApiOperation({
+    summary:
+      'Reconfigure and recreate a stopped session container (preserves session ID and workspace)',
+  })
+  @ApiResponse({ status: 200, type: SessionDetailResponseDto })
+  async recreate(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: RecreateSessionDto,
+  ) {
+    const existing = await this.sessionsService.findOne(organizationId, id);
+
+    if (existing.status !== 'COMPLETED' && existing.status !== 'FAILED') {
+      throw new BadRequestException(
+        'Session must be stopped (COMPLETED or FAILED) to reconfigure. Stop it first.',
+      );
+    }
+
+    // 1. Snapshot current container (if one exists and is still around)
+    let snapshotImage: string | null = null;
+    if (existing.containerId) {
+      const state = await this.containerService.getContainerState(
+        existing.containerId,
+      );
+      if (state !== 'gone') {
+        try {
+          snapshotImage = await this.containerService.commitContainer(
+            existing.containerId,
+            `${id}-${Date.now()}`,
+          );
+        } catch (err) {
+          // If we cannot snapshot we abort — losing workspace silently is worse
+          throw new BadRequestException(
+            `Failed to snapshot current container: ${(err as Error).message}`,
+          );
+        }
+      }
+    }
+
+    // 2. Close open terminals; stop and remove the old container (keep DinD volume)
+    this.terminalManager.closeByPrefix(`${id}:`);
+    if (existing.containerId) {
+      await this.containerService.stopContainer(existing.containerId);
+      // NOTE: sessionId intentionally omitted so the DinD volume is preserved
+      await this.containerService.removeContainer(existing.containerId);
+    }
+
+    // 3. Apply new config to DB (transactional); sets status=CREATING
+    const { session } = await this.sessionsService.applyRecreateConfig(
+      organizationId,
+      id,
+      dto,
+    );
+
+    // 4. Spawn new container in background (mirrors create() pattern)
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    setImmediate(async () => {
+      try {
+        // Build repo configs with authenticated clone URLs (same as create())
+        const repos: Array<{ name: string; cloneUrl: string; branch: string }> =
+          [];
+        for (const sr of session.repositories) {
+          let cloneUrl = sr.repository.cloneUrl;
+          try {
+            const integration = await this.prisma.integration.findFirst({
+              where: { id: sr.repository.integrationId, organizationId },
+            });
+            if (integration?.config && integration?.configIv) {
+              const config =
+                this.encryption.decryptJson<Record<string, string>>(
+                  Buffer.from(integration.config),
+                  Buffer.from(integration.configIv),
+                );
+              const token =
+                config.accessToken || config.apiToken || config.token;
+              if (token && cloneUrl.startsWith('https://')) {
+                const url = new URL(cloneUrl);
+                if (sr.repository.provider === 'GITLAB') {
+                  url.username = 'oauth2';
+                  url.password = token;
+                } else {
+                  url.username = token;
+                }
+                cloneUrl = url.toString();
+              }
+            }
+          } catch {
+            // Fall back to unauthenticated URL
+          }
+          repos.push({
+            name: sr.repository.name,
+            cloneUrl,
+            branch: sr.repository.defaultBranch,
+          });
+        }
+
+        // Resolve integration configs (inherit from env if none set directly)
+        const integrationConfigs: Array<{
+          type: string;
+          config: Record<string, string>;
+        }> = [];
+        let sessionIntegrationIds = session.integrations.map(
+          (i) => i.integrationId,
+        );
+        if (sessionIntegrationIds.length === 0 && session.environmentId) {
+          const envIntegrations =
+            await this.prisma.environmentIntegration.findMany({
+              where: { environmentId: session.environmentId },
+              select: { integrationId: true },
+            });
+          sessionIntegrationIds = envIntegrations.map((ei) => ei.integrationId);
+        }
+        if (sessionIntegrationIds.length > 0) {
+          const integrations = await this.prisma.integration.findMany({
+            where: {
+              id: { in: sessionIntegrationIds },
+              organizationId,
+              status: 'CONNECTED',
+            },
+          });
+          for (const integration of integrations) {
+            try {
+              const config =
+                this.encryption.decryptJson<Record<string, string>>(
+                  Buffer.from(integration.config),
+                  Buffer.from(integration.configIv),
+                );
+              integrationConfigs.push({
+                type: integration.type.toLowerCase(),
+                config,
+              });
+            } catch {
+              // Skip integration we can't decrypt
+            }
+          }
+        }
+
+        // Load environment config for resource limits + setup script + variables
+        let envConfig: SessionContainerConfig['environment'] | undefined;
+        if (session.environmentId) {
+          const env = await this.prisma.environment.findFirst({
+            where: { id: session.environmentId, organizationId },
+            include: { variables: true },
+          });
+          if (env) {
+            envConfig = {
+              memoryMb: env.memoryMb,
+              cpuCores: env.cpuCores,
+              setupScript: env.setupScript,
+              variables: env.variables.map((v) => ({
+                key: v.key,
+                value: v.value,
+              })),
+            };
+          }
+        }
+
+        const containerId = await this.containerService.createAndStart({
+          sessionId: id,
+          organizationId,
+          repos,
+          instructions: session.instructions,
+          provider: session.aiCredential?.provider,
+          enableDocker: session.enableDocker,
+          environment: envConfig,
+          integrations:
+            integrationConfigs.length > 0 ? integrationConfigs : undefined,
+          image: snapshotImage ?? undefined,
+        });
+
+        await this.sessionsService.updateStatus(id, 'RUNNING', containerId);
+        this.eventsGateway.emitSessionStatus(organizationId, id, 'RUNNING');
+
+        // Cleanup snapshot image now that container is running
+        if (snapshotImage) {
+          await this.containerService.removeImage(snapshotImage);
+        }
+      } catch (err) {
+        await this.sessionsService.updateStatus(id, 'FAILED');
+        this.eventsGateway.emitSessionStatus(
+          organizationId,
+          id,
+          'FAILED',
+          (err as Error).message,
+        );
+      }
+    });
+
     return { session };
   }
 

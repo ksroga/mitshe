@@ -19,6 +19,12 @@ export interface SessionContainerConfig {
     type: string;
     config: Record<string, string>;
   }>;
+  /**
+   * Override the base image. Used when recreating a session from a
+   * committed snapshot so /workspace contents are preserved.
+   * Defaults to the configured executor image.
+   */
+  image?: string;
 }
 
 /**
@@ -61,7 +67,7 @@ export class SessionContainerService implements OnModuleInit {
     this.logger.log(`Creating session container: ${containerName}`);
 
     const container = await this.docker.createContainer({
-      Image: this.executorImage,
+      Image: config.image ?? this.executorImage,
       name: containerName,
       User: 'root',
       Entrypoint: ['bash', '-c'],

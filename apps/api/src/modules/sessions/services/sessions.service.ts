@@ -1,7 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/persistence/prisma/prisma.service';
 import { SessionStatus, Prisma } from '@prisma/client';
-import { CreateSessionDto } from '../dto/session.dto';
+import {
+  CreateSessionDto,
+  RecreateSessionDto,
+  UpdateSessionMetadataDto,
+} from '../dto/session.dto';
 
 @Injectable()
 export class SessionsService {
@@ -100,6 +104,96 @@ export class SessionsService {
     }
 
     return session;
+  }
+
+  async updateMetadata(
+    organizationId: string,
+    id: string,
+    dto: UpdateSessionMetadataDto,
+  ) {
+    await this.findOne(organizationId, id);
+
+    const data: Prisma.AgentSessionUpdateInput = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.instructions !== undefined) data.instructions = dto.instructions;
+    if (dto.projectId !== undefined) {
+      data.project = dto.projectId
+        ? { connect: { id: dto.projectId } }
+        : { disconnect: true };
+    }
+
+    await this.prisma.agentSession.update({ where: { id }, data });
+    return this.findOne(organizationId, id);
+  }
+
+  async applyRecreateConfig(
+    organizationId: string,
+    id: string,
+    dto: RecreateSessionDto,
+  ) {
+    const current = await this.findOne(organizationId, id);
+
+    await this.prisma.$transaction(async (tx) => {
+      const data: Prisma.AgentSessionUpdateInput = {
+        status: 'CREATING',
+        containerId: null,
+      };
+
+      if (dto.name !== undefined) data.name = dto.name;
+      if (dto.instructions !== undefined) data.instructions = dto.instructions;
+      if (dto.startArguments !== undefined)
+        data.startArguments = dto.startArguments || null;
+      if (dto.enableDocker !== undefined) data.enableDocker = dto.enableDocker;
+
+      if (dto.projectId !== undefined) {
+        data.project = dto.projectId
+          ? { connect: { id: dto.projectId } }
+          : { disconnect: true };
+      }
+      if (dto.aiCredentialId !== undefined) {
+        data.aiCredential = dto.aiCredentialId
+          ? { connect: { id: dto.aiCredentialId } }
+          : { disconnect: true };
+      }
+      if (dto.agentDefinitionId !== undefined) {
+        data.agentDefinition = dto.agentDefinitionId
+          ? { connect: { id: dto.agentDefinitionId } }
+          : { disconnect: true };
+      }
+      if (dto.environmentId !== undefined) {
+        data.environment = dto.environmentId
+          ? { connect: { id: dto.environmentId } }
+          : { disconnect: true };
+      }
+
+      await tx.agentSession.update({ where: { id }, data });
+
+      if (dto.repositoryIds !== undefined) {
+        await tx.sessionRepository.deleteMany({ where: { sessionId: id } });
+        if (dto.repositoryIds.length > 0) {
+          await tx.sessionRepository.createMany({
+            data: dto.repositoryIds.map((repositoryId) => ({
+              sessionId: id,
+              repositoryId,
+            })),
+          });
+        }
+      }
+
+      if (dto.integrationIds !== undefined) {
+        await tx.sessionIntegration.deleteMany({ where: { sessionId: id } });
+        if (dto.integrationIds.length > 0) {
+          await tx.sessionIntegration.createMany({
+            data: dto.integrationIds.map((integrationId) => ({
+              sessionId: id,
+              integrationId,
+            })),
+          });
+        }
+      }
+    });
+
+    return { session: await this.findOne(organizationId, id), previous: current };
   }
 
   async remove(organizationId: string, id: string) {

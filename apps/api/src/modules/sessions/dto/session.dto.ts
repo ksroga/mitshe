@@ -64,6 +64,81 @@ export class CreateSessionDto {
   enableDocker?: boolean;
 }
 
+export class UpdateSessionMetadataDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Session name' })
+  name?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({
+    description: 'Project ID (pass empty string to detach)',
+  })
+  projectId?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'System instructions' })
+  instructions?: string;
+}
+
+export class RecreateSessionDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Session name' })
+  name?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Project ID' })
+  projectId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Repository IDs to attach' })
+  repositoryIds?: string[];
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'AI credential ID' })
+  aiCredentialId?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Agent definition ID (preset)' })
+  agentDefinitionId?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Start arguments for the agent CLI' })
+  startArguments?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Integration IDs to attach' })
+  integrationIds?: string[];
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Environment ID' })
+  environmentId?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'System instructions' })
+  instructions?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Enable Docker socket in container' })
+  enableDocker?: boolean;
+}
+
 export class SessionResponseDto {
   @ApiProperty() id: string;
   @ApiProperty() organizationId: string;
