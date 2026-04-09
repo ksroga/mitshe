@@ -7,6 +7,17 @@
 
 mitshe automates development workflows using AI agents and provides interactive workspaces for hands-on collaboration with AI. Connect your tools (Jira, GitHub, GitLab, Slack), build visual automation pipelines, and work with AI agents like Claude Code or OpenClaw directly in your browser - complete with a terminal, code editor, and file browser. Each session runs in an isolated Docker container with full access to your repositories.
 
+![mitshe dashboard](docs/dashboard.png)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](docs/dashboard.png) | ![Projects](docs/projects.png) |
+| ![Tasks](docs/tasks.png) | ![Workflows](docs/workflows.png) |
+| ![Executions](docs/executions.png) | ![Integrations](docs/integrations.png) |
+| ![Documentation](docs/documentation.png) | |
+
 ## Run it
 
 ```bash
